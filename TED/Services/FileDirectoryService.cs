@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using TED.Models;
 
@@ -15,11 +16,24 @@ namespace TED.Services
                 var di = new DirectoryInfo(d);
                 result.Add(new FileDirectory
                 {
+                    Id = Guid.NewGuid(),
                     Name = di.Name,
-                    FullPath = Path.Combine(root, di.Name)
+                    FullPath = Path.Combine(root, di.Name),
+                    NumberOfMediaFound = NumberOfMediaFilesForFileDirectory(di),
+                    HasTagData = TagDataFoundForFileDirectory(di)
                 });
             }
             return result;
+        }
+
+        private bool TagDataFoundForFileDirectory(DirectoryInfo directory)
+        {
+            return directory.GetFiles("tagData.json", SearchOption.TopDirectoryOnly).Length > 0;
+        }
+
+        private long NumberOfMediaFilesForFileDirectory(DirectoryInfo directory)
+        {
+            return directory.GetFiles("*.mp3", SearchOption.AllDirectories).LongLength;
         }
     }
 }

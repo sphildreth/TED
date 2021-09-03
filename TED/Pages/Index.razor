@@ -20,12 +20,37 @@
     </div>
 </div>
 
-@foreach(var dd in discoveredDirectories)
-{ 
 <div class="row">
-    <div class="col">@dd.Name</div>
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th scope="col" width="5%"><input class="form-check-input" type="checkbox" @onclick="ToggleSelectAll"></th>
+                <th scope="col">Name</th>
+                <th scope="col">Media Count</th>
+                <th scope="col" class="text-end">Has Tag Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var dd in discoveredDirectories)
+            {
+            <tr data-id="@(dd.Id)">
+                <th scope="row"><input class="form-check-input" type="checkbox"></th>
+                <td>@dd.Name</td>
+                <td>@dd.NumberOfMediaFound</td>
+                <td class="text-end"><i class="bi bi-check-circle-fill @(dd.HasTagData ? "tagdata-found" : "")"></i></td>
+            </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr>
+                <th scope="row"></th>
+                <td>Directories: @(discoveredDirectories.Count())</td>
+                <td>Media: @(discoveredDirectories.Sum(x => x.NumberOfMediaFound))</td>
+                <td class="text-end">Has Tag Data: @(discoveredDirectories.Count(x => x.HasTagData))</td>
+            </tr>
+        </tfoot>
+    </table>
 </div>
-}
 
 
 @code {

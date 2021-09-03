@@ -4,6 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="ElectronNET.API" Version="13.5.1" />
+    <PackageReference Include="Roadie.Api.Services" Version="1.0.0" />
+    <PackageReference Include="Roadie.Library" Version="1.0.0" />
   </ItemGroup>
   <ItemGroup>
     <Content Update="electron.manifest.json">

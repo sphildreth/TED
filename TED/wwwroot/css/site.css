@@ -46,3 +46,8 @@ a, .btn-link {
         right: 0.75rem;
         top: 0.5rem;
     }
+
+
+.tagdata-found {
+    color: green;
+}
