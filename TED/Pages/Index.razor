@@ -1,0 +1,50 @@
+﻿@page "/"
+
+@using TED.Services
+@using TED.Models
+
+@inject FileDirectoryService FileDirectoryService
+
+<div class="row">
+    <div class="col-9">
+        <select class="form-select" aria-label="File Directories" @onchange="SetSelectedDirectory">
+            <option value="" disabled selected>Select a Directory</option>
+            @foreach (var fileDirectory in fileDirectories)
+            {
+                <option value="@fileDirectory.FullPath">@fileDirectory.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col">
+        <button type="button" class="btn btn-primary" disabled="@(string.IsNullOrEmpty(_selectedFileDirectory))" @onclick="DiscoverMusicInSelectedDirectory"><i class="bi bi-arrow-repeat"></i></button>
+    </div>
+</div>
+
+@foreach(var dd in discoveredDirectories)
+{ 
+<div class="row">
+    <div class="col">@dd.Name</div>
+</div>
+}
+
+
+@code {
+    private IEnumerable<FileDirectory> fileDirectories;
+    private string _selectedFileDirectory = null;
+    private IEnumerable<FileDirectory> discoveredDirectories = Enumerable.Empty<FileDirectory>();
+
+    void SetSelectedDirectory(ChangeEventArgs e)
+    {
+        _selectedFileDirectory = e.Value.ToString();
+    }
+
+    void DiscoverMusicInSelectedDirectory()
+    {
+        discoveredDirectories = FileDirectoryService.GetFileDirectories(_selectedFileDirectory, System.IO.SearchOption.TopDirectoryOnly);
+    }
+
+    protected override void OnInitialized()
+    {
+        fileDirectories = FileDirectoryService.GetFileDirectories(null); base.OnInitialized();
+    }
+}
