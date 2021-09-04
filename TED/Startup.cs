@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Roadie.Library.Caching;
 using Roadie.Library.Configuration;
 using System;
+using TED.Models;
 using TED.Services;
 
 namespace TED
@@ -28,6 +29,8 @@ namespace TED
         {
             services.AddRazorPages();
             services.AddServerSideBlazor();
+
+            services.Configure<TEDSettings>(Configuration.GetSection("TEDSettings"));
 
             services.AddSingleton<IRoadieSettings>(options =>
             {

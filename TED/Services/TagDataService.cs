@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Roadie.Library;
 using Roadie.Library.Caching;
 using Roadie.Library.Configuration;
@@ -8,6 +9,7 @@ using Roadie.Library.MetaData.ID3Tags;
 using Roadie.Library.Processors;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -21,6 +23,8 @@ namespace TED.Services
 {
     public sealed class TagDataService
     {
+        private IOptions<TEDSettings> TEDSettings { get; }
+
         private IRoadieSettings RoadieSettings { get; }
 
         private ILogger Logger { get; }
@@ -32,10 +36,12 @@ namespace TED.Services
         private ICacheManager CacheManager { get; }
 
         public TagDataService(
+            IOptions<TEDSettings> tedSettings,
             IRoadieSettings roadieSettings,
             ILogger<TagDataService> logger,
             ICacheManager cachemanager)
         {
+            TEDSettings = tedSettings;
             RoadieSettings = roadieSettings;
             Logger = logger;
 
@@ -60,6 +66,7 @@ namespace TED.Services
             {
                 return false;
             }
+            RunScript("PreDiscover.ps1", fileDirectory.FullPath);
             var result = new TagData();
             var mediaFiles = Directory.GetFiles(fileDirectory.FullPath, "*.mp3", SearchOption.AllDirectories);
             if (mediaFiles?.Any() == true)
@@ -128,42 +135,46 @@ namespace TED.Services
             return false;
         }
 
-        private string RunScript(string scriptFilename, bool doCopy, bool isReadOnly, string directoryToInspect, string dest)
+        private string RunScript(string scriptFilename, string directoryToInspect)
         {
-            if (string.IsNullOrEmpty(scriptFilename))
+            if (string.IsNullOrEmpty(scriptFilename) || string.IsNullOrEmpty(directoryToInspect))
             {
                 return null;
             }
 
             try
             {
-                if (!File.Exists(scriptFilename))
+                var scriptFolder = TEDSettings.Value.ScriptingFolder;
+                if(string.IsNullOrEmpty(scriptFolder))
                 {
-                    Console.WriteLine($"Script Not Found: [{ scriptFilename }]");
+                    Trace.WriteLine($"RunScript: Invalid ScriptingFolder");
                     return null;
                 }
-
+                scriptFilename = Path.Combine(scriptFolder, scriptFilename);
+                if (!File.Exists(scriptFilename))
+                {
+                    Trace.WriteLine($"RunScript: Script Not Found: [{ scriptFilename }]");
+                    return null;
+                }
                 Console.WriteLine($"Running Script: [{ scriptFilename }]");
                 var script = File.ReadAllText(scriptFilename);
                 using (var ps = PowerShell.Create())
                 {
                     var r = string.Empty;
                     var results = ps.AddScript(script)
-                                    .AddParameter("DoCopy", doCopy)
-                                    .AddParameter("IsReadOnly", isReadOnly)
                                     .AddParameter("DirectoryToInspect", directoryToInspect)
-                                    .AddParameter("Dest", dest)
                                     .Invoke();
                     foreach (var result in results)
                     {
                         r += result + Environment.NewLine;
                     }
+                    Trace.Write($"RunScript: [{ r }]");
                     return r;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"📛 Error with Script File [{scriptFilename}], Error [{ex}] ");
+                Trace.WriteLine($"📛 Error with Script File [{scriptFilename}], Error [{ex}] ");
             }
             return null;
         }

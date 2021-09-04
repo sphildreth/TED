@@ -17,6 +17,7 @@ namespace TED.Models
         public bool IsSelected { get; set; }
 
         private static readonly string[] SizeSuffixes = { "bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" };
+
         public static string SizeSuffix(Int64 value, int decimalPlaces = 1)
         {
             if (decimalPlaces < 0) { throw new ArgumentOutOfRangeException("decimalPlaces"); }
@@ -26,7 +27,7 @@ namespace TED.Models
             // mag is 0 for bytes, 1 for KB, 2, for MB, etc.
             int mag = (int)Math.Log(value, 1024);
 
-            // 1L << (mag * 10) == 2 ^ (10 * mag) 
+            // 1L << (mag * 10) == 2 ^ (10 * mag)
             // [i.e. the number of bytes in the unit corresponding to mag]
             decimal adjustedSize = (decimal)value / (1L << (mag * 10));
 
