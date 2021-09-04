@@ -4,6 +4,7 @@
 @using TED.Models
 
 @inject FileDirectoryService FileDirectoryService
+@inject TagDataService TagDataService
 
 <div class="row">
     <div class="col-9">
@@ -17,6 +18,7 @@
     </div>
     <div class="col">
         <button type="button" class="btn btn-primary" disabled="@(string.IsNullOrEmpty(_selectedFileDirectory))" @onclick="DiscoverMusicInSelectedDirectory"><i class="bi bi-arrow-repeat"></i></button>
+        <button type="button" class="btn btn-primary" disabled="@(string.IsNullOrEmpty(_selectedFileDirectory))" @onclick="GenerateTagDataForSelectedDirectories"><i class="bi bi-archive"></i></button>
     </div>
 </div>
 
@@ -70,6 +72,15 @@
     void SetSelectedDirectory(ChangeEventArgs e)
     {
         _selectedFileDirectory = e.Value.ToString();
+    }
+
+    async Task GenerateTagDataForSelectedDirectories()
+    {
+        foreach(var selectedDirectory in discoveredDirectories.Where(x => x.IsSelected).ToArray())
+        {
+            await TagDataService.CreateTagDataForFileDirectoryAsync(selectedDirectory);
+            selectedDirectory.IsSelected = false;
+        }
     }
 
     void DiscoverMusicInSelectedDirectory()

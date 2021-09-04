@@ -5,6 +5,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Roadie.Library.Caching;
+using Roadie.Library.Configuration;
+using System;
 using TED.Services;
 
 namespace TED
@@ -24,7 +28,26 @@ namespace TED
         {
             services.AddRazorPages();
             services.AddServerSideBlazor();
+
+            services.AddSingleton<IRoadieSettings>(options =>
+            {
+                var settings = new RoadieSettings();
+                IConfigurationBuilder configurationBuilder = new ConfigurationBuilder();
+                configurationBuilder.AddJsonFile("appsettings.json", false);
+                IConfiguration configuration = configurationBuilder.Build();
+                configuration.GetSection("RoadieSettings").Bind(settings);
+                settings.ConnectionString = configuration.GetConnectionString("RoadieDatabaseConnection");
+                return settings;
+            });
+
+            services.AddSingleton<ICacheManager>(options =>
+            {
+                var logger = options.GetService<ILogger<DictionaryCacheManager>>();
+                return new DictionaryCacheManager(logger, new Utf8JsonCacheSerializer(logger), new CachePolicy(TimeSpan.FromHours(4)));
+            });
+
             services.AddSingleton<FileDirectoryService>();
+            services.AddSingleton<TagDataService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

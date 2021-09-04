@@ -16,4 +16,15 @@
     <Folder Include="wwwroot\js\" />
     <Folder Include="wwwroot\fonts\" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="IdSharp.AudioInfo-core">
+      <HintPath>..\..\roadie\libraries\IdSharp.AudioInfo-core.dll</HintPath>
+    </Reference>
+    <Reference Include="IdSharp.Common-core">
+      <HintPath>..\..\roadie\libraries\IdSharp.Common-core.dll</HintPath>
+    </Reference>
+    <Reference Include="IdSharp.Tagging-core">
+      <HintPath>..\..\roadie\libraries\IdSharp.Tagging-core.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>
