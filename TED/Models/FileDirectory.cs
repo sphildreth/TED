@@ -9,5 +9,6 @@ namespace TED.Models
         public string FullPath { get; set; }
         public long NumberOfMediaFound { get; set; }
         public bool HasTagData { get; set; }
+        public bool IsSelected { get; set; }
     }
 }

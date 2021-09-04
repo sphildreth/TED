@@ -20,7 +20,7 @@ namespace TED.Services
                     Name = di.Name,
                     FullPath = Path.Combine(root, di.Name),
                     NumberOfMediaFound = NumberOfMediaFilesForFileDirectory(di),
-                    HasTagData = TagDataFoundForFileDirectory(di)
+                    HasTagData = TagDataFoundForFileDirectory(di),
                 });
             }
             return result;
