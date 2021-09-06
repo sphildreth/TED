@@ -66,72 +66,89 @@ namespace TED.Services
             {
                 return false;
             }
-            RunScript("PreDiscover.ps1", fileDirectory.FullPath);
             var result = new TagData();
-            var mediaFiles = Directory.GetFiles(fileDirectory.FullPath, "*.mp3", SearchOption.AllDirectories);
-            if (mediaFiles?.Any() == true)
+
+            try
             {
-                var sw = Stopwatch.StartNew();
-                var resultMedias = new List<Media>();
-                var tagDataForFileDirectory = new List<AudioMetaData>();
-                foreach (var mediaFile in mediaFiles)
+                RunScript("PreDiscover.ps1", fileDirectory.FullPath);
+                SfvFile sfvFile = null;
+                var sfvFiles = Directory.GetFiles(fileDirectory.FullPath, "*.sfv", SearchOption.AllDirectories);
+                if (sfvFiles.Any())
                 {
-                    var fileInfo = new FileInfo(mediaFile);
-                    var tagData = TagsHelper.MetaDataForFile(fileInfo.FullName, true);
-                    if (!tagData?.IsSuccess ?? false)
-                    {
-                        Trace.WriteLine($"INVALID: Missing: {ID3TagsHelper.DetermineMissingRequiredMetaData(tagData.Data)}");
-                        continue;
-                    }
-                    tagDataForFileDirectory.Add(tagData.Data);
+                    sfvFile = await ParseSfvFile(sfvFiles.First()).ConfigureAwait(false);
                 }
-                var resultReleases = new List<Release>();
-                foreach (var tabLibReleaseGroups in tagDataForFileDirectory.GroupBy(x=> x.Release))
+                var mediaFiles = Directory.GetFiles(fileDirectory.FullPath, "*.mp3", SearchOption.AllDirectories);
+                if (mediaFiles?.Any() == true)
                 {
-                    var tabLibsForRelease = tabLibReleaseGroups.ToArray();
-                    var releaseImages = ImageHelper.FindImageTypeInDirectory(tabLibsForRelease.First().FileInfo.Directory, Roadie.Library.Enums.ImageType.Release, SearchOption.TopDirectoryOnly).ToList();
-                    releaseImages.AddRange(ImageHelper.FindImageTypeInDirectory(tabLibsForRelease.First().FileInfo.Directory, Roadie.Library.Enums.ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly));
-                    resultReleases.Add(new Release
+                    var sw = Stopwatch.StartNew();
+                    var resultMedias = new List<Media>();
+                    var tagDataForFileDirectory = new List<AudioMetaData>();
+                    foreach (var mediaFile in mediaFiles)
                     {
-                        Artist = tabLibsForRelease.First().Artist,
-                        Directory = fileDirectory.FullPath,
-                        ModifiedDate = fileDirectoryInfo.LastWriteTimeUtc,
-                        Name = tabLibsForRelease.First().Release,
-                        Year = tabLibsForRelease.First().Year.Value,
-                        HasTagImage = tabLibsForRelease.Any(x => x.Images?.Any() ?? false),
-                        ImageFiles = releaseImages.Select(x => x.FullName).Distinct().ToArray(),
-                        ReleaseMedia = tabLibsForRelease.GroupBy(x => x.Disc ?? 1).Select(x => new ReleaseMedia
+                        var fileInfo = new FileInfo(mediaFile);
+                        var tagData = TagsHelper.MetaDataForFile(fileInfo.FullName, true);
+                        if (!tagData?.IsSuccess ?? false)
                         {
-                            ReleaseMediaNumber = x.Key,
-                            Media = x.Select(xx => new Media
+                            Trace.WriteLine($"INVALID: Missing: {ID3TagsHelper.DetermineMissingRequiredMetaData(tagData.Data)}");
+                            continue;
+                        }
+                        tagDataForFileDirectory.Add(tagData.Data);
+                    }
+                    var resultReleases = new List<Release>();
+                    foreach (var tabLibReleaseGroups in tagDataForFileDirectory.GroupBy(x => x.Release))
+                    {
+                        var tabLibsForRelease = tabLibReleaseGroups.ToArray();
+                        var releaseImages = ImageHelper.FindImageTypeInDirectory(tabLibsForRelease.First().FileInfo.Directory, Roadie.Library.Enums.ImageType.Release, SearchOption.TopDirectoryOnly).ToList();
+                        releaseImages.AddRange(ImageHelper.FindImageTypeInDirectory(tabLibsForRelease.First().FileInfo.Directory, Roadie.Library.Enums.ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly));
+                        resultReleases.Add(new Release
+                        {
+                            Artist = tabLibsForRelease.First().Artist,
+                            Directory = fileDirectory.FullPath,
+                            ModifiedDate = fileDirectoryInfo.LastWriteTimeUtc,
+                            Name = tabLibsForRelease.First().Release,
+                            Year = tabLibsForRelease.First().Year.Value,
+                            HasTagImage = tabLibsForRelease.Any(x => x.Images?.Any() ?? false),
+                            ImageFiles = releaseImages.Select(x => x.FullName).Distinct().ToArray(),
+                            ReleaseMedia = tabLibsForRelease.GroupBy(x => x.Disc ?? 1).Select(x => new ReleaseMedia
                             {
-                                FileName = xx.FileInfo.Name,
-                                FileSize = xx.FileInfo.Length,
-                                Length = xx.TotalSeconds,
-                                Title = xx.Title,
-                                TrackNumber = xx.TrackNumber.Value
+                                ReleaseMediaNumber = x.Key,
+                                Media = x.Select(xx => new Media
+                                {
+                                    FileName = xx.FileInfo.Name,
+                                    FileSize = xx.FileInfo.Length,
+                                    Length = xx.TotalSeconds,
+                                    Title = xx.Title,
+                                    TrackNumber = xx.TrackNumber.Value
+                                })
                             })
-                        })
-                    }); ;
+                        });
+                    }
+                    if (resultReleases.Count() == 1)
+                    {
+                        var releaseImages = ImageHelper.FindImageTypeInDirectory(fileDirectoryInfo, Roadie.Library.Enums.ImageType.Release, SearchOption.TopDirectoryOnly).ToList();
+                        releaseImages.AddRange(ImageHelper.FindImageTypeInDirectory(fileDirectoryInfo, Roadie.Library.Enums.ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly));
+                        releaseImages.AddRange(resultReleases.First().ImageFiles.Select(x => new FileInfo(x)));
+                        resultReleases.First().ImageFiles = releaseImages.Select(x => x.FullName).Distinct().OrderBy(x => x).ToArray();
+                        resultReleases.First().ExpectedTrackNumber = sfvFile == null ? 0 : sfvFile.Entries.Count(x => x.TrackNumber > 0);
+                    }
+                    result.Releases = resultReleases;
+                    result.CreatedDate = DateTime.UtcNow;
+                    var artistImages = ImageHelper.FindImageTypeInDirectory(fileDirectoryInfo, Roadie.Library.Enums.ImageType.Artist, SearchOption.TopDirectoryOnly).ToList();
+                    artistImages.AddRange(ImageHelper.FindImageTypeInDirectory(fileDirectoryInfo, Roadie.Library.Enums.ImageType.ArtistSecondary, SearchOption.TopDirectoryOnly));
+                    result.ArtistImageFiles = artistImages.Select(x => x.FullName).Distinct().ToArray();
+                    sw.Stop();
+                    result.GenerationDuration = sw.ElapsedMilliseconds;
+                    string jsonString = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(Path.Combine(fileDirectory.FullPath, "tagData.json"), jsonString).ConfigureAwait(false);
+                    RunScript("PostDiscover.ps1", fileDirectory.FullPath);
+                    return true;
                 }
-                if (resultReleases.Count() == 1)
-                {
-                    var releaseImages = ImageHelper.FindImageTypeInDirectory(fileDirectoryInfo, Roadie.Library.Enums.ImageType.Release, SearchOption.TopDirectoryOnly).ToList();
-                    releaseImages.AddRange(ImageHelper.FindImageTypeInDirectory(fileDirectoryInfo, Roadie.Library.Enums.ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly));
-                    releaseImages.AddRange(resultReleases.First().ImageFiles.Select(x => new FileInfo(x)));
-                    resultReleases.First().ImageFiles = releaseImages.Select(x => x.FullName).Distinct().ToArray();
-                }
-                result.Releases = resultReleases;
-                result.CreatedDate = DateTime.UtcNow;
-                var artistImages = ImageHelper.FindImageTypeInDirectory(fileDirectoryInfo, Roadie.Library.Enums.ImageType.Artist, SearchOption.TopDirectoryOnly).ToList();
-                artistImages.AddRange(ImageHelper.FindImageTypeInDirectory(fileDirectoryInfo, Roadie.Library.Enums.ImageType.ArtistSecondary, SearchOption.TopDirectoryOnly));
-                result.ArtistImageFiles = artistImages.Select(x => x.FullName).Distinct().ToArray();
-                sw.Stop();
-                result.GenerationDuration = sw.ElapsedMilliseconds;
-                string jsonString = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(Path.Combine(fileDirectory.FullPath, "tagData.json"), jsonString).ConfigureAwait(false);
-                return true;
+
             }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex);
+            }            
             return false;
         }
 
@@ -207,5 +224,24 @@ namespace TED.Services
             }
         }
 
+        public static async Task<SfvFile> ParseSfvFile(string sfvFileName)
+        {
+            var result = new SfvFile
+            {
+                Name = sfvFileName
+            };
+            var data = new List<SfvFileEntry>();
+            foreach(var line in (await File.ReadAllLinesAsync(sfvFileName).ConfigureAwait(false)).Where(x => !string.IsNullOrEmpty(x) && !x.StartsWith(";")))
+            {
+                var parts = line.Split(' ');
+                data.Add(new SfvFileEntry
+                {
+                    FileName = string.Join(' ', parts.Take(parts.Length -1)),
+                    Crc32 = parts[parts.Length - 1]
+                });
+            };
+            result.Entries = data;
+            return result;
+        }
     }
 }
