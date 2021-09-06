@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using System.Text.Json;
 using System.Threading.Tasks;
 using TED.Models;
@@ -162,7 +163,7 @@ namespace TED.Services
             try
             {
                 var scriptFolder = TEDSettings.Value.ScriptingFolder;
-                if(string.IsNullOrEmpty(scriptFolder))
+                if (string.IsNullOrEmpty(scriptFolder))
                 {
                     Trace.WriteLine($"RunScript: Invalid ScriptingFolder");
                     return null;
@@ -173,7 +174,8 @@ namespace TED.Services
                     Trace.WriteLine($"RunScript: Script Not Found: [{ scriptFilename }]");
                     return null;
                 }
-                Console.WriteLine($"Running Script: [{ scriptFilename }]");
+                Console.WriteLine($"Running Script: [{ scriptFilename }] Parameter [{ directoryToInspect }]");
+
                 var script = File.ReadAllText(scriptFilename);
                 using (var ps = PowerShell.Create())
                 {
@@ -188,6 +190,49 @@ namespace TED.Services
                     Trace.Write($"RunScript: [{ r }]");
                     return r;
                 }
+
+                //RunspaceConfiguration runspaceConfiguration = RunspaceConfiguration.Create();
+                //Runspace runspace = RunspaceFactory.CreateRunspace(runspaceConfiguration);
+                //runspace.Open();
+                //Pipeline pipeline = runspace.CreatePipeline();
+                ////Here's how you add a new script with arguments
+                //Command myCommand = new Command(scriptfile);
+                //CommandParameter testParam = new CommandParameter("key", "value");
+                //myCommand.Parameters.Add(testParam);
+                //pipeline.Commands.Add(myCommand);
+                //// Execute PowerShell script
+                //results = pipeline.Invoke();
+
+                //InitialSessionState runspaceConfiguration = InitialSessionState.Create();
+                //using (Runspace runspace = RunspaceFactory.CreateRunspace(runspaceConfiguration))
+                //{
+                //    runspace.Open();
+
+                //    PowerShell ps = PowerShell.Create();
+                //    ps.Runspace = runspace;
+                //    //ps.AddScript(script);
+                //    //ps.AddCommand()
+                //    //ps.AddParameter("DirectoryToInspect", directoryToInspect);
+
+                //    Command cmd = new Command(script, true);
+                //    cmd.Parameters.Add(new CommandParameter("DirectoryToInspect", directoryToInspect));
+                //    ps.AddCommand(new CommandInfo
+                //    {
+                //         CommandType = CommandTypes.ExternalScript
+                //    });
+
+                //    // Call the PowerShell.Invoke() method to run
+                //    // the pipeline synchronously.
+                //    foreach (PSObject result in ps.Invoke())
+                //    {
+                //        var t = 1;
+                //        //Console.WriteLine("{0,-20}{1}",
+                //         //   result.Members["Name"].Value,
+                //          //  result.Members["Value"].Value);
+                //    } // End foreach.
+                //}
+
+
             }
             catch (Exception ex)
             {
