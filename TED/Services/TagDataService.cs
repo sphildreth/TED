@@ -9,12 +9,10 @@ using Roadie.Library.MetaData.ID3Tags;
 using Roadie.Library.Processors;
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
-using System.Management.Automation.Runspaces;
 using System.Text.Json;
 using System.Threading.Tasks;
 using TED.Models;
@@ -58,12 +56,12 @@ namespace TED.Services
 
         public async Task<bool> CreateTagDataForFileDirectoryAsync(FileDirectory fileDirectory)
         {
-            if(string.IsNullOrEmpty(fileDirectory?.FullPath))
+            if (string.IsNullOrEmpty(fileDirectory?.FullPath))
             {
                 return false;
             }
             var fileDirectoryInfo = new DirectoryInfo(fileDirectory.FullPath);
-            if(!fileDirectoryInfo.Exists)
+            if (!fileDirectoryInfo.Exists)
             {
                 return false;
             }
@@ -88,11 +86,6 @@ namespace TED.Services
                     {
                         var fileInfo = new FileInfo(mediaFile);
                         var tagData = TagsHelper.MetaDataForFile(fileInfo.FullName, true);
-                        if (!tagData?.IsSuccess ?? false)
-                        {
-                            Trace.WriteLine($"INVALID: Missing: {ID3TagsHelper.DetermineMissingRequiredMetaData(tagData.Data)}");
-                            continue;
-                        }
                         tagDataForFileDirectory.Add(tagData.Data);
                     }
                     var resultReleases = new List<Release>();
@@ -103,14 +96,14 @@ namespace TED.Services
                         releaseImages.AddRange(ImageHelper.FindImageTypeInDirectory(tabLibsForRelease.First().FileInfo.Directory, Roadie.Library.Enums.ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly));
                         resultReleases.Add(new Release
                         {
-                            Artist = tabLibsForRelease.First().Artist,
+                            Artist = tabLibsForRelease.FirstOrDefault()?.Artist,
                             Directory = fileDirectory.FullPath,
                             ModifiedDate = fileDirectoryInfo.LastWriteTimeUtc,
-                            Name = tabLibsForRelease.First().Release,
-                            Year = tabLibsForRelease.First().Year.Value,
+                            Name = tabLibsForRelease.FirstOrDefault()?.Release,
+                            Year = tabLibsForRelease.FirstOrDefault()?.Year ?? 0,
                             HasTagImage = tabLibsForRelease.Any(x => x.Images?.Any() ?? false),
                             ImageFiles = releaseImages.Select(x => x.FullName).Distinct().ToArray(),
-                            ReleaseMedia = tabLibsForRelease.GroupBy(x => x.Disc ?? 1).Select(x => new ReleaseMedia
+                            ReleaseMedia = tabLibsForRelease.GroupBy(x => x.Disc == 0 ? 1 : x.Disc ?? 1).Select(x => new ReleaseMedia
                             {
                                 ReleaseMediaNumber = x.Key,
                                 Media = x.Select(xx => new Media
@@ -144,12 +137,11 @@ namespace TED.Services
                     RunScript("PostDiscover.ps1", fileDirectory.FullPath);
                     return true;
                 }
-
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex);
-            }            
+            }
             return false;
         }
 
@@ -231,8 +223,6 @@ namespace TED.Services
                 //          //  result.Members["Value"].Value);
                 //    } // End foreach.
                 //}
-
-
             }
             catch (Exception ex)
             {
@@ -276,12 +266,12 @@ namespace TED.Services
                 Name = sfvFileName
             };
             var data = new List<SfvFileEntry>();
-            foreach(var line in (await File.ReadAllLinesAsync(sfvFileName).ConfigureAwait(false)).Where(x => !string.IsNullOrEmpty(x) && !x.StartsWith(";")))
+            foreach (var line in (await File.ReadAllLinesAsync(sfvFileName).ConfigureAwait(false)).Where(x => !string.IsNullOrEmpty(x) && !x.StartsWith(";")))
             {
                 var parts = line.Split(' ');
                 data.Add(new SfvFileEntry
                 {
-                    FileName = string.Join(' ', parts.Take(parts.Length -1)),
+                    FileName = string.Join(' ', parts.Take(parts.Length - 1)),
                     Crc32 = parts[parts.Length - 1]
                 });
             };

@@ -51,3 +51,7 @@ a, .btn-link {
 .tagdata-found {
     color: green;
 }
+
+.tagdata-invalid {
+    color: red !important;
+}

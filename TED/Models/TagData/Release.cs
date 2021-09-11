@@ -25,7 +25,7 @@ namespace TED.Models.TagData
         /// </summary>
         public bool HasTagImage { get; set; }
 
-        public bool IsComplete => (ExpectedTrackNumber == 0 || (ExpectedTrackNumber > 0 && ExpectedTrackNumber == TotalTrackNumber)) && ReleaseMedia.All(x => x.IsComplete);
+        public bool IsComplete => (ExpectedTrackNumber == 0 || (ExpectedTrackNumber > 0 && ExpectedTrackNumber == TotalTrackNumber)) && (ReleaseMedia?.All(x => x.IsComplete) ?? false);
 
         public bool IsValid => HasValidYear && IsNameValid && IsComplete && IsTrackDurationValid;
 

@@ -16,6 +16,8 @@ namespace TED.Models
 
         public bool IsSelected { get; set; }
 
+        public bool IsTagDataValid { get; set; }
+
         private static readonly string[] SizeSuffixes = { "bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" };
 
         public static string SizeSuffix(Int64 value, int decimalPlaces = 1)

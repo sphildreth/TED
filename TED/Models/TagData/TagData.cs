@@ -23,7 +23,7 @@ namespace TED.Models.TagData
 
         public long GenerationDuration { get; set; }
 
-        public bool AllReleasesComplete => Releases.All(x => x.IsComplete);
+        public bool AllReleasesComplete => Releases?.Count() > 0 && Releases.All(x => x.IsComplete);
 
         public bool IsValid => AllReleasesComplete;
 
