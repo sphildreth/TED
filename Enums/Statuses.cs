@@ -1,4 +1,4 @@
-namespace Roadie.Enums
+namespace TED.Enums
 {
     public enum Statuses : short
     {

@@ -1,0 +1,71 @@
+@using TED.Models.MetaData;
+@using System.Text.Json
+@using Microsoft.Extensions.Configuration
+
+@inject IConfiguration Configuration
+
+@page "/inbound"
+
+<PageTitle>Inbound</PageTitle>
+
+<MudToolBar>
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.ScreenSearchDesktop" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>    
+    <MudSpacer />
+    <MudProgressCircular Class="@(_scanning ? "visible" : "invisible")" Color="Color.Default" Indeterminate="true" />    
+</MudToolBar>
+
+@foreach (var release in _releases)
+{
+    @if(release.Release == null)
+    {
+        <h4>
+                release?.ToString()
+        </h4>
+    }
+    else
+    {
+        <MudCard>
+            <MudCardContent>
+                <MudText>@release.Release?.Text</MudText>
+                <MudText Typo="Typo.body2">The quick, brown fox jumps over a lazy dog.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary">Learn More</MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+}
+
+@code {
+    bool _scanning = false;
+    IEnumerable<ReleaseList> _releases = Enumerable.Empty<ReleaseList>();
+
+    public Inbound()
+    {            
+    }
+
+    async Task DoScan()
+    {
+        if(!_scanning)
+        {
+            _scanning = true;
+            var foundReleases = new List<ReleaseList>();
+            var folderToScan = @Configuration["TED:InboundFolder"];
+            foreach(var dir in Directory.EnumerateDirectories(folderToScan))
+            {
+                var jsonFileName = Path.Combine(dir, "ted.data.json");
+                if(File.Exists(jsonFileName))
+                {
+                    var fileText = await System.IO.File.ReadAllTextAsync(jsonFileName);
+                    var release = JsonSerializer.Deserialize<ReleaseList>(fileText);
+                    if(release != null)
+                    {
+                        foundReleases.Add(release);
+                    }
+                }
+            }
+            _releases = foundReleases.ToArray();
+            _scanning = false;
+        }
+    }
+}

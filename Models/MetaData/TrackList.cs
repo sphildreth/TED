@@ -1,76 +1,62 @@
 using NodaTime;
-using Roadie.Enums;
-using Roadie.Utility;
+using TED.Enums;
+using TED.Utility;
 
-namespace Roadie.Models.MetaData
+namespace TED.Models.MetaData
 {
     public class TrackList : MetaDataBase
     {
-
-        public TrackList(IRandomNumber randomNumber, IClock clock, string fileName, string fileHash, int? duration, int? favoriteCount, int? fileSize, DateTime? lastPlayed, int? mediaNumber, IEnumerable<string> partTitlesList, int? playedCount, short? rating, DateTime? releaseDate, Statuses? status, Image thumbnail, string title, DataToken track, ArtistList trackArtist, int? trackNumber, string trackPlayUrl)
-            : base(randomNumber, clock)
+        public TrackList()
+            : base(null, null)
         {
-            FileName = fileName;
-            FileHash = fileHash;
-            Duration = duration;
-            FavoriteCount = favoriteCount;
-            FileSize = fileSize;
-            LastPlayed = lastPlayed;
-            MediaNumber = mediaNumber;
-            PartTitlesList = partTitlesList;
-            PlayedCount = playedCount;
-            Rating = rating;
-            ReleaseDate = releaseDate;
-            Status = status;
-            Thumbnail = thumbnail;
-            Title = title;
-            Track = track;
-            TrackArtist = trackArtist;
-            TrackNumber = trackNumber;
-            TrackPlayUrl = trackPlayUrl;
         }
 
-        public string FileName { get;  }
+        public TrackList(IRandomNumber randomNumber, IClock clock)
+            : base(randomNumber, clock)
+        {
+        }
 
-        public string FileHash { get; }
+        public string FileName { get; set; }
 
-        public int? Duration { get; }
+        public string FileHash { get; set; }
+
+        public int? Duration { get; set; }
 
         public string DurationTime => Duration.HasValue ? new TimeInfo(Duration.Value).ToFullFormattedString() : "--:--";
 
         public string DurationTimeShort => Duration.HasValue ? new TimeInfo(Duration.Value).ToShortFormattedString() : "--:--";
 
-        public int? FavoriteCount { get; }
+        public int? FavoriteCount { get; set; }
 
-        public int? FileSize { get; }
+        public int? FileSize { get; set; }
 
-        public DateTime? LastPlayed { get; }
+        public DateTime? LastPlayed { get; set; }
 
-        public int? MediaNumber { get; }
+        public int? MediaNumber { get; set; }
 
-        public IEnumerable<string> PartTitlesList { get; }
+        public IEnumerable<string>? PartTitlesList { get; set; }
 
-        public int? PlayedCount { get; }
+        public int? PlayedCount { get; set; }
 
-        public short? Rating { get; }
+        public short? Rating { get; set; }
 
-        public DateTime? ReleaseDate { get; }
+        public DateTime? ReleaseDate { get; set; }
 
-        public Statuses? Status { get; }
+        public Statuses? Status { get; set; }
 
         public string StatusVerbose => (Status ?? Statuses.Missing).ToString();
 
-        public Image Thumbnail { get; }
+        public Image? Thumbnail { get; set; }
 
-        public string Title { get; }
+        public string Title { get; set; }
 
-        public DataToken Track { get; }
+        public DataToken? Track { get; set; }
 
-        public ArtistList TrackArtist { get; }
+        public ArtistList? TrackArtist { get; set; }
 
-        public int? TrackNumber { get; }
+        public int? TrackNumber { get; set; }
 
-        public string TrackPlayUrl { get; }
+        public string TrackPlayUrl { get; set; }
 
         public int? Year
         {

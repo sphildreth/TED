@@ -1,30 +1,25 @@
 using NodaTime;
-using Roadie.Utility;
+using TED.Utility;
 
-namespace Roadie.Models.MetaData
+namespace TED.Models.MetaData
 {
-    public sealed class ReleaseList<T> : MetaDataBase
+    public sealed class ReleaseList : MetaDataBase
     {
-        public ReleaseList(IRandomNumber randomNumber, IClock clock, DataToken artist, Image artistThumbnail, decimal? duration, DataToken genre, DateTime? lastPlayed, IEnumerable<ReleaseMediaList<T>> media, int? mediaCount, double? rank, short? rating, DataToken release)
-            : base(randomNumber, clock)
+        public ReleaseList()
+            :base(null, null)
         {
-            Artist = artist;
-            ArtistThumbnail = artistThumbnail;
-            Duration = duration;
-            Genre = genre;
-            LastPlayed = lastPlayed;
-            Media = media;
-            MediaCount = mediaCount;
-            Rank = rank;
-            Rating = rating;
-            Release = release;
         }
 
-        public DataToken Artist { get;  }
+        public ReleaseList(IRandomNumber randomNumber, IClock clock)
+            : base(randomNumber, clock)
+        {
+        }
 
-        public Image ArtistThumbnail { get;  }
+        public DataToken? Artist { get; set; }
 
-        public decimal? Duration { get;  }
+        public Image? ArtistThumbnail { get; set; }
+
+        public decimal? Duration { get; set; }
 
         public string DurationTime
         {
@@ -39,7 +34,7 @@ namespace Roadie.Models.MetaData
             }
         }
 
-        public DataToken Genre { get;  }
+        public DataToken? Genre { get; set; }
 
         public bool IsValid
         {
@@ -53,17 +48,17 @@ namespace Roadie.Models.MetaData
             }
         }
 
-        public DateTime? LastPlayed { get;  }
+        public DateTime? LastPlayed { get; set; }
 
-        public IEnumerable<ReleaseMediaList<T>> Media { get;  }
+        public IEnumerable<ReleaseMediaList>? Media { get; set; }
 
-        public int? MediaCount { get;  }
+        public int? MediaCount { get; set; }
 
-        public double? Rank { get;  }
+        public double? Rank { get; set; }
 
-        public short? Rating { get;  }
+        public short? Rating { get; set; }
 
-        public DataToken Release { get;  }
+        public DataToken? Release { get; set; }
 
     }
 }

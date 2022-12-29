@@ -1,23 +1,27 @@
 using NodaTime;
-using Roadie.Utility;
+using TED.Utility;
 
-namespace Roadie.Models.MetaData
+namespace TED.Models.MetaData
 {
     [Serializable]
-    public sealed class ReleaseMediaList<T> : MetaDataBase
+    public sealed class ReleaseMediaList : MetaDataBase
     {
-        public ReleaseMediaList(IRandomNumber randomNumber, IClock clock, short? mediaNumber, string? subTitle, int? trackCount, IEnumerable<T> tracks)
-            : base(randomNumber, clock)
+        public ReleaseMediaList()
+            : base(null, null)
         {
-            MediaNumber = mediaNumber;
-            SubTitle = subTitle;
-            TrackCount = trackCount;
-            Tracks = tracks;
         }
 
-        public short? MediaNumber { get; }
-        public string? SubTitle { get; }
-        public int? TrackCount { get; }
-        public IEnumerable<T> Tracks { get; } = Enumerable.Empty<T>();
+        public ReleaseMediaList(IRandomNumber randomNumber, IClock clock)
+            : base(randomNumber, clock)
+        {
+        }
+
+        public short? MediaNumber { get; set; }
+
+        public string? SubTitle { get; set; }
+
+        public int? TrackCount { get; set; }
+
+        public IEnumerable<TrackList> Tracks { get; set; } = Enumerable.Empty<TrackList>();
     }
 }

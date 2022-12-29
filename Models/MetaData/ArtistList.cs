@@ -1,39 +1,44 @@
 using NodaTime;
-using Roadie.Enums;
-using Roadie.Utility;
+using TED.Enums;
+using TED.Utility;
 
-namespace Roadie.Models.MetaData
+namespace TED.Models.MetaData
 {
     [Serializable]
     public sealed class ArtistList : MetaDataBase
     {
-        public ArtistList(IRandomNumber randomNumber, IClock clock, DataToken artist, DateTime? lastPlayed, IEnumerable<string> missingReleasesForCollection, int? playedCount, double? rank, short? rating, int? releaseCount, Image thumbnail, int? trackCount, Statuses? status)
-            :base(randomNumber, clock)
+        public ArtistList()
+            : base(null, null)
         {
-            Artist = artist;
-            LastPlayed = lastPlayed;
-            MissingReleasesForCollection = missingReleasesForCollection;
-            PlayedCount = playedCount;
-            Rank = rank;
-            Rating = rating;
-            ReleaseCount = releaseCount;
-            Thumbnail = thumbnail;
-            TrackCount = trackCount;
-            Status = status;
         }
 
-        public DataToken Artist { get; }
-        public bool IsValid => Id != Guid.Empty;
-        public DateTime? LastPlayed { get; }
-        public IEnumerable<string> MissingReleasesForCollection { get; }
-        public int? PlayedCount { get;  }
-        public double? Rank { get;  }
-        public short? Rating { get;  }
-        public int? ReleaseCount { get;  }
-        public Image Thumbnail { get;  }
-        public int? TrackCount { get;  }
-        public Statuses? Status { get;  }
-        public string StatusVerbose => (Status ?? Statuses.Missing).ToString();
+        public ArtistList(IRandomNumber randomNumber, IClock clock)
+            : base(randomNumber, clock)
+        {
+        }
 
+        public DataToken? Artist { get; set; }
+
+        public bool IsValid => Id != Guid.Empty;
+
+        public DateTime? LastPlayed { get; set; }
+
+        public IEnumerable<string>? MissingReleasesForCollection { get; set; }
+
+        public int? PlayedCount { get; set; }
+
+        public double? Rank { get; set; }
+
+        public short? Rating { get; set; }
+
+        public int? ReleaseCount { get; set; }
+
+        public Image? Thumbnail { get; set; }
+
+        public int? TrackCount { get; set; }
+
+        public Statuses? Status { get; set; }
+
+        public string StatusVerbose => (Status ?? Statuses.Missing).ToString();
     }
 }

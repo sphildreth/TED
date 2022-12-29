@@ -1,4 +1,4 @@
-namespace Roadie.Utility
+namespace TED.Utility
 {
     public interface IRandomNumber
     {

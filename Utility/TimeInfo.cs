@@ -1,6 +1,6 @@
 using System;
 
-namespace Roadie.Utility
+namespace TED.Utility
 {
     public sealed class TimeInfo
     {

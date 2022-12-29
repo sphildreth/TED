@@ -1,16 +1,16 @@
 using System.ComponentModel.DataAnnotations;
 using NodaTime;
-using Roadie.Utility;
+using TED.Utility;
 
-namespace Roadie.Models.MetaData
+namespace TED.Models.MetaData
 {
     [Serializable]
     public abstract class MetaDataBase
     {
-        public MetaDataBase(IRandomNumber randomNumber, IClock clock)
+        public MetaDataBase(IRandomNumber? randomNumber, IClock? clock)
         {
-            RandomSortId = randomNumber.Next();
-            CreatedDate = clock.GetCurrentInstant().ToDateTimeUtc();
+            RandomSortId = randomNumber?.Next() ?? 0;
+            CreatedDate = clock?.GetCurrentInstant().ToDateTimeUtc() ?? DateTime.MinValue;
             Id = Guid.NewGuid();
         }
 

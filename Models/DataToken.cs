@@ -1,30 +1,27 @@
-namespace Roadie.Models 
+namespace TED.Models
 {
     /// <summary>
     /// Generic Data "Token" (or List Item) for associations and child lists on objects. Example "Genres" for a Release.
-    /// </summary>    
+    /// </summary>
     [Serializable]
     public sealed class DataToken
     {
         /// <summary>
         /// This is the Text to show to the user (ie name of genre or artist or label)
-        /// </summary>        
-        public string Text { get; }
+        /// </summary>
+        public string? Text { get; set; }
 
         public string? Tooltip { get; set; }
 
         /// <summary>
         /// This is the value to submit or the Key (Guid) of the item
         /// </summary>
-        public string Value { get; }
+        public string? Value { get; set; }
 
-        public int RandomSortId { get; }
+        public int RandomSortId { get; set; }
 
-        public DataToken(string text, string value, int? randomSortId = null)
+        public DataToken()
         {
-            Text = text;
-            Value = value;
-            RandomSortId = randomSortId ?? 0;
         }
     }
 }
