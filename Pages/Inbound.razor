@@ -50,7 +50,7 @@
                             <MudText Typo="Typo.subtitle1">Media Number: @media.MediaNumber</MudText>
                             @foreach (var track in media.Tracks)
                             {
-                                <MudText Typo="Typo.body2"><MudChip Variant="Variant.Text" Color="Color.Primary">@track.TrackNumber</MudChip> @track.Title</MudText>
+                                <MudText Class="clipped-text" Typo="Typo.body2"><MudChip Variant="Variant.Text" Color="Color.Primary">@track.TrackNumber</MudChip> @track.Title</MudText>
                             }
                         }
                     </MudCardContent>
