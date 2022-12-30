@@ -1,7 +1,26 @@
 ﻿.status-incomplete, .status-missing {
-    border: solid 2px yellow;
+    border: 2px solid yellow;
 }
 
 .status-error { 
-    border: solid 2px red;
+    border: 2px solid red;
+}
+
+.status-needsattention {
+    border: 2px solid orange; 
+}
+
+.truncate-text {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-status-needsattention { 
+    color: red !important;
+}
+
+.release-invalid, .media-invalid, .track-invalid { 
+    background-color: tomato !important;
 }

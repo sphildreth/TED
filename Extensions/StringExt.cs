@@ -1,4 +1,6 @@
-﻿namespace TED.Extensions
+﻿using System.Text.RegularExpressions;
+
+namespace TED.Extensions
 {
     public static class StringExt
     {
@@ -10,5 +12,6 @@
             }
             return input;
         }
+
     }
 }

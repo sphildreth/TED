@@ -12,6 +12,7 @@ namespace TED.Enums
         Expired = 7,
         ReadyToMigrate = 8,
         Migrated = 9,
+        NeedsAttention = 10,
         Deleted = 99
     }
 }

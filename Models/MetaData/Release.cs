@@ -55,7 +55,8 @@ namespace TED.Models.MetaData
                 var releaseName = ReleaseData?.Text;
                 return Id != Guid.Empty &&
                        !string.IsNullOrEmpty(artistName) &&
-                       !string.IsNullOrEmpty(releaseName);
+                       !string.IsNullOrEmpty(releaseName) && 
+                       (Status != Statuses.Incomplete && Status != Statuses.NeedsAttention && Status != Statuses.Incomplete);
             }
         }
 

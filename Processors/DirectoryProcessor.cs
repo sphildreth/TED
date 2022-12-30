@@ -1,5 +1,8 @@
 ﻿using MudBlazor;
+using MudBlazor.Charts;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using TED.Enums;
 using TED.Extensions;
 using TED.Models.MetaData;
 using TED.Utility;
@@ -8,6 +11,10 @@ namespace TED.Processors
 {
     public sealed class DirectoryProcessor
     {
+        private static readonly Regex _hasFeatureFragmentsRegex = new(@"\((ft.|feat.|featuring|feature)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\\s*(-\\s)*((CD[_\-#\s]*[0-9]*)))|((\\(|\\[)+([0-9]|,|self|bonus|re(leas|master|(e|d)*)*|th|anniversary|cd|disc|deluxe|dig(ipack)*|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|\\s)+(]|\\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _unwantedTrackTitleTextRegex = new(@"^([0-9]+)(\.|-|\s)*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         public DirectoryProcessor()
         {
         }
@@ -15,6 +22,8 @@ namespace TED.Processors
         public Release? Process(DateTime now, string dir, string[] filesInDirectory)
         {
             var allfileAtlsFound = new List<ATL.Track>();
+            string? directorySFVFile = null;
+            string? directoryM3UFile = null;
             var release = new Release();
             release.Directory = dir;
             foreach (var file in filesInDirectory)
@@ -23,6 +32,14 @@ namespace TED.Processors
                 if (fileAtl != null)
                 {
                     allfileAtlsFound.Add(fileAtl);
+                }
+                if(string.Equals(Path.GetExtension(file), ".sfv", StringComparison.OrdinalIgnoreCase))
+                {
+                    directorySFVFile = file;
+                }
+                if (string.Equals(Path.GetExtension(file), ".m3u", StringComparison.OrdinalIgnoreCase))
+                {
+                    directoryM3UFile = file;
                 }
             }
             if (allfileAtlsFound.Any(x => x.AudioFormat.ID > -1))
@@ -103,7 +120,7 @@ namespace TED.Processors
                                 FileName = x.FileInfo().FullName,
                                 FileSize = SafeParser.ToNumber<int?>(x.FileInfo().Length),
                                 Id = Guid.NewGuid(),
-                                Status = Enums.Statuses.New,
+                                Status = (x.FileInfo()?.Exists ?? false) ? Statuses.New : Statuses.Missing,
                                 Title = x.Title,
                                 TrackArtist = string.IsNullOrWhiteSpace(x.Artist) || string.Equals(releaseData.Artist.Value, x.Artist, StringComparison.OrdinalIgnoreCase) ? null : new Artist
                                 {
@@ -118,20 +135,146 @@ namespace TED.Processors
                         });
                     }
                     releaseData.Media = medias;
+                    releaseData.TrackCount = medias.Sum(x => x.TrackCount);
                     releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Count() == releaseData.Media.Sum(x => x.TrackCount) ? Enums.Statuses.Ok : Enums.Statuses.Incomplete;
                     releaseData.Duration = medias.SelectMany(x => x.Tracks).Sum(x => x.Duration);
-                    var roadieDataFilenameByRelease = $"{releaseData.Artist.Text.ToFileNameFriendly()}.";
-                    if (filesAtlsGroupedByRelease.Count() == 1)
+                    if(releaseData.Status == Enums.Statuses.Ok && directorySFVFile.Nullify() != null)
                     {
-                        roadieDataFilenameByRelease = null;
+                        if(releaseData.TrackCount != GetMp3CountFromSFVFile(directorySFVFile)) 
+                        {
+                            releaseData.Status = Enums.Statuses.Incomplete;
+                        }
                     }
-                    var roadieDataFileName = Path.Combine(dir, $"ted.data.{roadieDataFilenameByRelease}json");
+                    if (releaseData.Status == Enums.Statuses.Ok && directoryM3UFile.Nullify() != null)
+                    {
+                        if (releaseData.TrackCount != GetMp3CountFromM3UFile(directoryM3UFile))
+                        {
+                            releaseData.Status = Enums.Statuses.Incomplete;
+                        }
+                    }
+                    foreach(var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v,i) => new { i, v}))
+                    {
+                        foreach(var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
+                        {
+                            track.t.Status = CheckTrackStatus(track.t);
+                            if(track.t.TrackNumber != track.i + 1)
+                            {
+                                track.t.Status = Statuses.NeedsAttention;
+                            }
+                        }
+                        if(media.v.MediaNumber != media.i + 1)
+                        {
+                            releaseData.Status = Statuses.NeedsAttention;
+                        }
+                    }
+                    releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Any(x => x.Status != Statuses.New) ? Statuses.NeedsAttention : releaseData.Status;
+                    if(releaseData.Status == Statuses.Ok)
+                    {
+                        releaseData.Status = CheckReleaseStatus(releaseData);
+                    }
+                    var roadieDataFileName = Path.Combine(dir, $"ted.data.{releaseData.Artist.Text.ToFileNameFriendly()}.json");
                     System.IO.File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(releaseData));
                     return releaseData;
                 }
 
             }
             return release;
+        }
+
+        private Statuses CheckReleaseStatus(Release release)
+        {
+            if (ReleaseHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty))
+            {
+                return Statuses.NeedsAttention;
+            }
+            return release.Status ?? Statuses.NeedsAttention;
+        }
+
+        private Statuses CheckTrackStatus(Track track)
+        {
+            if(TrackHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(track?.Title ?? string.Empty))
+            {
+                return Statuses.NeedsAttention;
+            }
+            return track.Status ?? Statuses.Missing;
+        }
+
+        private static bool TrackHasFeaturingFragments(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return false;
+            }
+            return _hasFeatureFragmentsRegex.IsMatch(input);
+        }
+
+        private static bool ReleaseHasUnwantedText(string releaseTitle)
+        {
+            if (string.IsNullOrWhiteSpace(releaseTitle))
+            {
+                return false;
+            }
+            return _unwantedReleaseTitleTextRegex.IsMatch(releaseTitle);
+        }
+
+        private static bool TrackHasUnwantedText(string trackTitle)
+        {
+            if (string.IsNullOrWhiteSpace(trackTitle))
+            {
+                return false;
+            }
+            return _unwantedTrackTitleTextRegex.IsMatch(trackTitle);
+        }
+
+
+        private static int GetMp3CountFromM3UFile(string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                return 0;
+            }
+            var result = 0;
+            foreach(var line in File.ReadAllLines(filePath)) 
+            {
+                if (IsLineForFileForTrack(line))
+                {
+                    result++;
+                }
+            }
+            return result;
+        }
+
+        private static int GetMp3CountFromSFVFile(string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                return 0;
+            }
+            var result = 0;
+            foreach (var line in File.ReadAllLines(filePath))
+            {
+                if (IsLineForFileForTrack(line))
+                {
+                    result++;
+                }
+            }
+            return result;
+        }
+
+        private static bool IsLineForFileForTrack(string lineFromFile)
+        {
+            if (string.IsNullOrWhiteSpace(lineFromFile))
+            {
+                return false;
+            }
+            if (lineFromFile.Contains(".mp3", StringComparison.OrdinalIgnoreCase) || 
+                lineFromFile.Contains(".flac", StringComparison.OrdinalIgnoreCase) ||
+                lineFromFile.Contains(".wav", StringComparison.OrdinalIgnoreCase) ||
+                lineFromFile.Contains(".ac4", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return false;
         }
     }
 }

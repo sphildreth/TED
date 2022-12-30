@@ -16,6 +16,19 @@ namespace TED.Models.MetaData
         {
         }
 
+        public bool IsValid
+        {
+            get
+            {
+                return Id != Guid.Empty &&
+                       TrackNumber > 0 &&
+                       Duration > 0 &&
+                       !string.IsNullOrEmpty(Title) && 
+                       !string.IsNullOrEmpty(FileName) && 
+                       FileSize > 0;
+            }
+        }
+
         public string? FileName { get; set; }
 
         public string? FileHash { get; set; }
@@ -39,8 +52,6 @@ namespace TED.Models.MetaData
         public Image? Thumbnail { get; set; }
 
         public string? Title { get; set; }
-
-        public DataToken? TrackData { get; set; }
 
         public Artist? TrackArtist { get; set; }
 
