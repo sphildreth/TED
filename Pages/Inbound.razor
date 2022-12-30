@@ -4,7 +4,7 @@
 @using TED.Processors;
 @using TED.Utility;
 @using TED.Extensions;
-
+@inject IDialogService DialogService
 @inject IConfiguration Configuration
 
 @page "/inbound"
@@ -52,8 +52,8 @@
             <MudCard xs="4" Class="@($"release-{(release.IsValid ? "valid" : "invalid")} status-{release.Status.ToString().ToLower()} ma-2")">
                 <MudCardActions>
                     <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
-                        <MudIconButton OnClick="@(() => OpenReleaseFolder(release.Directory))" Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
+                        <MudIconButton OnClick="@((e) => OpenReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" />
+                        <MudIconButton OnClick="@((e) => DeleteReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
                     </MudButtonGroup>
                 </MudCardActions>
@@ -72,7 +72,7 @@
                     </CardHeaderContent>
                 </MudCardHeader>
 
-                <MudCardMedia class="pa-2" Height=200 Style="margin:auto;max-height:200px;width:200px;" Image=@($"data:image/jpeg;base64,{ Convert.ToBase64String(release.Thumbnail?.Bytes ?? new byte[0])}") />
+                <MudCardMedia class="pa-2" Height=200 Style="margin:auto;max-height:200px;width:200px;" Image=@($"data:image/jpeg;base64,{ Convert.ToBase64String(release.CoverImage?.Bytes ?? new byte[0])}") />
 
                 <MudCardContent>
                     @foreach (var media in release.Media ?? Enumerable.Empty<ReleaseMedia>())
@@ -102,9 +102,25 @@
     {
     }
 
-    void OpenReleaseFolder(string dir)
+    void OpenReleaseDirectory(string dir)
     {
         System.Diagnostics.Process.Start("explorer.exe", dir);
+    }
+
+    async Task DeleteReleaseDirectory(string dir)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", "Continue to delete release directory? This process cannot be undone.");
+        parameters.Add("ButtonText", "Delete");
+        parameters.Add("Color", Color.Error);
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<Dialog>("Delete Directory", parameters);
+        var result = await dialog.Result;
+        if (!result.Cancelled)
+        {
+            Directory.Delete(dir, true);
+            _releases.Remove(_releases.First(x => x.Directory == dir));
+        }
     }
 
     async Task DoScan()
@@ -121,37 +137,24 @@
             _directorysFound = directorysToProcess.Count();
             foreach (var dir in directorysToProcess)
             {
-                var jsonFileName = Path.Combine(dir, "ted.data.json");
-                if (File.Exists(jsonFileName))
+                var filesInDirectory = Directory.GetFiles(dir);
+                if (filesInDirectory.Any())
                 {
-                    var fileText = await System.IO.File.ReadAllTextAsync(jsonFileName);
-                    var release = JsonSerializer.Deserialize<Release>(fileText);
-                    if (release != null)
+                    var releaseForDirectory = await directoryProcessor.ProcessAsync(now, dir, filesInDirectory);
+                    if (releaseForDirectory != null)
                     {
-                        _releases.Add(release);
+                        _releases.Add(releaseForDirectory);
                     }
                 }
-                else
+                foreach (var subDir in Directory.GetDirectories(dir, "*", SearchOption.AllDirectories))
                 {
-                    var filesInDirectory = Directory.GetFiles(dir);
-                    if (filesInDirectory.Any())
+                    var filesInSubDirectory = Directory.GetFiles(subDir);
+                    if (filesInSubDirectory.Any())
                     {
-                        var releaseForDirectory = directoryProcessor.Process(now, dir, filesInDirectory);
+                        var releaseForDirectory = await directoryProcessor.ProcessAsync(now, subDir, filesInSubDirectory);
                         if (releaseForDirectory != null)
                         {
                             _releases.Add(releaseForDirectory);
-                        }
-                    }
-                    foreach (var subDir in Directory.GetDirectories(dir, "*", SearchOption.AllDirectories))
-                    {
-                        var filesInSubDirectory = Directory.GetFiles(subDir);
-                        if (filesInSubDirectory.Any())
-                        {
-                            var releaseForDirectory = directoryProcessor.Process(now, subDir, filesInSubDirectory);
-                            if (releaseForDirectory != null)
-                            {
-                                _releases.Add(releaseForDirectory);
-                            }
                         }
                     }
                 }

@@ -1,9 +1,8 @@
-﻿using MudBlazor;
-using MudBlazor.Charts;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 using TED.Enums;
 using TED.Extensions;
+using TED.Models;
 using TED.Models.MetaData;
 using TED.Utility;
 
@@ -12,14 +11,18 @@ namespace TED.Processors
     public sealed class DirectoryProcessor
     {
         private static readonly Regex _hasFeatureFragmentsRegex = new(@"\((ft.|feat.|featuring|feature)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\\s*(-\\s)*((CD[_\-#\s]*[0-9]*)))|((\\(|\\[)+([0-9]|,|self|bonus|re(leas|master|(e|d)*)*|th|anniversary|cd|disc|deluxe|dig(ipack)*|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|\\s)+(]|\\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         private static readonly Regex _unwantedTrackTitleTextRegex = new(@"^([0-9]+)(\.|-|\s)*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        private static string ImageNotFound = @"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";
 
         public DirectoryProcessor()
         {
         }
 
-        public Release? Process(DateTime now, string dir, string[] filesInDirectory)
+        public async Task<Release?> ProcessAsync(DateTime now, string dir, string[] filesInDirectory)
         {
             var allfileAtlsFound = new List<ATL.Track>();
             string? directorySFVFile = null;
@@ -33,7 +36,7 @@ namespace TED.Processors
                 {
                     allfileAtlsFound.Add(fileAtl);
                 }
-                if(string.Equals(Path.GetExtension(file), ".sfv", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(Path.GetExtension(file), ".sfv", StringComparison.OrdinalIgnoreCase))
                 {
                     directorySFVFile = file;
                 }
@@ -91,15 +94,31 @@ namespace TED.Processors
                             Caption = firstAtlHasArtistImage.Description
                         };
                     }
+                    else
+                    {
+                        releaseData.ArtistThumbnail = await FirstArtistImageInDirectory(dir, filesInDirectory);
+                    }
                     var firstAtlHasReleaseImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Front ||
                                                                                                  x.PicType == ATL.PictureInfo.PIC_TYPE.Generic);
                     if (firstAtlHasReleaseImage != null)
                     {
-                        releaseData.Thumbnail = new Models.Image
+                        releaseData.CoverImage = new Models.Image
                         {
                             Bytes = firstAtlHasReleaseImage.PictureData,
                             Caption = firstAtlHasReleaseImage.Description
                         };
+                    }
+                    else
+                    {
+                        releaseData.CoverImage = await FirstReleaseImageInDirectory(dir, filesInDirectory);
+                    }
+                    if (releaseData.CoverImage == null)
+                    {
+                        releaseData.CoverImage = new Models.Image
+                        {
+                            Bytes = Convert.FromBase64String(ImageNotFound)
+                        };
+                        releaseData.Status = Statuses.Incomplete;
                     }
                     var medias = new List<ReleaseMedia>();
                     foreach (var mp3TagData in tagsFilesFound.GroupBy(x => x.DiscNumber))
@@ -138,65 +157,106 @@ namespace TED.Processors
                     releaseData.TrackCount = medias.Sum(x => x.TrackCount);
                     releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Count() == releaseData.Media.Sum(x => x.TrackCount) ? Enums.Statuses.Ok : Enums.Statuses.Incomplete;
                     releaseData.Duration = medias.SelectMany(x => x.Tracks).Sum(x => x.Duration);
-                    if(releaseData.Status == Enums.Statuses.Ok && directorySFVFile.Nullify() != null)
+                    if (releaseData.Status == Enums.Statuses.Ok && directorySFVFile.Nullify() != null)
                     {
-                        if(releaseData.TrackCount != GetMp3CountFromSFVFile(directorySFVFile)) 
+                        if (releaseData.TrackCount != await GetMp3CountFromSFVFile(directorySFVFile))
                         {
                             releaseData.Status = Enums.Statuses.Incomplete;
                         }
                     }
                     if (releaseData.Status == Enums.Statuses.Ok && directoryM3UFile.Nullify() != null)
                     {
-                        if (releaseData.TrackCount != GetMp3CountFromM3UFile(directoryM3UFile))
+                        if (releaseData.TrackCount != await GetMp3CountFromM3UFile(directoryM3UFile))
                         {
                             releaseData.Status = Enums.Statuses.Incomplete;
                         }
                     }
-                    foreach(var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v,i) => new { i, v}))
+                    foreach (var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v, i) => new { i, v }))
                     {
-                        foreach(var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
+                        foreach (var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
                         {
                             track.t.Status = CheckTrackStatus(track.t);
-                            if(track.t.TrackNumber != track.i + 1)
+                            if (track.t.TrackNumber != track.i + 1)
                             {
                                 track.t.Status = Statuses.NeedsAttention;
                             }
                         }
-                        if(media.v.MediaNumber != media.i + 1)
+                        if (media.v.MediaNumber != media.i + 1)
                         {
                             releaseData.Status = Statuses.NeedsAttention;
                         }
                     }
                     releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Any(x => x.Status != Statuses.New) ? Statuses.NeedsAttention : releaseData.Status;
-                    if(releaseData.Status == Statuses.Ok)
+                    if (releaseData.Status == Statuses.Ok)
                     {
                         releaseData.Status = CheckReleaseStatus(releaseData);
                     }
-                    var roadieDataFileName = Path.Combine(dir, $"ted.data.{releaseData.Artist.Text.ToFileNameFriendly()}.json");
+                    var roadieDataFileName = Path.Combine(dir, $"ted.data.json");
                     System.IO.File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(releaseData));
                     return releaseData;
                 }
-
             }
             return release;
         }
 
-        private Statuses CheckReleaseStatus(Release release)
+        private static async Task<Image?> FirstArtistImageInDirectory(string dir, string[] filesInDirectory)
+        {
+            var artistImagesInFolder = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Artist, SearchOption.TopDirectoryOnly);
+            if (artistImagesInFolder?.Any() ?? false)
+            {
+                return new Image
+                {
+                    Bytes = await File.ReadAllBytesAsync(artistImagesInFolder.First().FullName)
+                };
+            }
+            var secondaryArtistImagesInFolder = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.ArtistSecondary, SearchOption.TopDirectoryOnly);
+            if (secondaryArtistImagesInFolder?.Any() ?? false)
+            {
+                return new Image
+                {
+                    Bytes = await File.ReadAllBytesAsync(secondaryArtistImagesInFolder.First().FullName)
+                };
+            }
+            return null;
+        }
+
+        private static async Task<Image?> FirstReleaseImageInDirectory(string dir, string[] filesInDirectory)
+        {
+            var releasetImagesInFolder = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Release, SearchOption.TopDirectoryOnly);
+            if (releasetImagesInFolder?.Any() ?? false)
+            {
+                return new Image
+                {
+                    Bytes = await File.ReadAllBytesAsync(releasetImagesInFolder.First().FullName)
+                };
+            }
+            var secondaryReleaseImagesInFolder = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
+            if (secondaryReleaseImagesInFolder?.Any() ?? false)
+            {
+                return new Image
+                {
+                    Bytes = await File.ReadAllBytesAsync(secondaryReleaseImagesInFolder.First().FullName)
+                };
+            }
+            return null;
+        }
+
+        private static Statuses CheckReleaseStatus(Release release)
         {
             if (ReleaseHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty))
             {
                 return Statuses.NeedsAttention;
             }
-            return release.Status ?? Statuses.NeedsAttention;
+            return release?.Status ?? Statuses.NeedsAttention;
         }
 
-        private Statuses CheckTrackStatus(Track track)
+        private static Statuses CheckTrackStatus(Track track)
         {
-            if(TrackHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(track?.Title ?? string.Empty))
+            if (TrackHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(track?.Title ?? string.Empty))
             {
                 return Statuses.NeedsAttention;
             }
-            return track.Status ?? Statuses.Missing;
+            return track?.Status ?? Statuses.Missing;
         }
 
         private static bool TrackHasFeaturingFragments(string input)
@@ -226,15 +286,14 @@ namespace TED.Processors
             return _unwantedTrackTitleTextRegex.IsMatch(trackTitle);
         }
 
-
-        private static int GetMp3CountFromM3UFile(string? filePath)
+        private static async Task<int> GetMp3CountFromM3UFile(string? filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
                 return 0;
             }
             var result = 0;
-            foreach(var line in File.ReadAllLines(filePath)) 
+            foreach (var line in await File.ReadAllLinesAsync(filePath))
             {
                 if (IsLineForFileForTrack(line))
                 {
@@ -244,14 +303,14 @@ namespace TED.Processors
             return result;
         }
 
-        private static int GetMp3CountFromSFVFile(string? filePath)
+        private static async Task<int> GetMp3CountFromSFVFile(string? filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
                 return 0;
             }
             var result = 0;
-            foreach (var line in File.ReadAllLines(filePath))
+            foreach (var line in await File.ReadAllLinesAsync(filePath))
             {
                 if (IsLineForFileForTrack(line))
                 {
@@ -267,7 +326,7 @@ namespace TED.Processors
             {
                 return false;
             }
-            if (lineFromFile.Contains(".mp3", StringComparison.OrdinalIgnoreCase) || 
+            if (lineFromFile.Contains(".mp3", StringComparison.OrdinalIgnoreCase) ||
                 lineFromFile.Contains(".flac", StringComparison.OrdinalIgnoreCase) ||
                 lineFromFile.Contains(".wav", StringComparison.OrdinalIgnoreCase) ||
                 lineFromFile.Contains(".ac4", StringComparison.OrdinalIgnoreCase))

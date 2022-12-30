@@ -19,7 +19,8 @@ namespace TED.Models.MetaData
 
         public DataToken? ArtistData { get; set; }
 
-        public bool IsValid => Id != Guid.Empty;
+        public bool IsValid => Id != Guid.Empty && 
+                               !string.IsNullOrEmpty(ArtistData?.Text);
 
         public IEnumerable<string>? MissingReleasesForCollection { get; set; }
 

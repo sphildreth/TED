@@ -16,16 +16,10 @@ namespace TED.Models.MetaData
         {
         }
 
-        public bool IsValid
-        {
-            get
-            {
-                return Id != Guid.Empty &&
-                       MediaNumber > 0 && 
+        public bool IsValid => Id != Guid.Empty &&
+                       MediaNumber > 0 &&
                        TrackCount > 0 &&
                        (Tracks?.Any() ?? false);
-            }
-        }
 
         public short? MediaNumber { get; set; }
 

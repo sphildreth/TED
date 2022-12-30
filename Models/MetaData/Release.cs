@@ -26,7 +26,7 @@ namespace TED.Models.MetaData
 
         public Image? ArtistThumbnail { get; set; }
 
-        public Image? Thumbnail { get; set; }
+        public Image? CoverImage { get; set; }
 
         public double? Duration { get; set; }
 
@@ -47,18 +47,11 @@ namespace TED.Models.MetaData
 
         public DataToken? Genre { get; set; }
 
-        public bool IsValid
-        {
-            get
-            {
-                var artistName = Artist?.Text;
-                var releaseName = ReleaseData?.Text;
-                return Id != Guid.Empty &&
-                       !string.IsNullOrEmpty(artistName) &&
-                       !string.IsNullOrEmpty(releaseName) && 
+        public bool IsValid => Id != Guid.Empty &&
+                       !string.IsNullOrEmpty(Artist?.Text) &&
+                       !string.IsNullOrEmpty(ReleaseData?.Text) &&
+                       CoverImage?.Bytes?.Length > 0 &&
                        (Status != Statuses.Incomplete && Status != Statuses.NeedsAttention && Status != Statuses.Incomplete);
-            }
-        }
 
         public IEnumerable<ReleaseMedia>? Media { get; set; }
 

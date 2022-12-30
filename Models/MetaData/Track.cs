@@ -16,18 +16,12 @@ namespace TED.Models.MetaData
         {
         }
 
-        public bool IsValid
-        {
-            get
-            {
-                return Id != Guid.Empty &&
+        public bool IsValid => Id != Guid.Empty &&
                        TrackNumber > 0 &&
                        Duration > 0 &&
-                       !string.IsNullOrEmpty(Title) && 
-                       !string.IsNullOrEmpty(FileName) && 
+                       !string.IsNullOrEmpty(Title) &&
+                       !string.IsNullOrEmpty(FileName) &&
                        FileSize > 0;
-            }
-        }
 
         public string? FileName { get; set; }
 
