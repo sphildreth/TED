@@ -1,3 +1,7 @@
 ﻿.status-incomplete, .status-missing {
     border: solid 2px yellow;
 }
+
+.status-error { 
+    border: solid 2px red;
+}

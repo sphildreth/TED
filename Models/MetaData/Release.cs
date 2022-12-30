@@ -17,6 +17,11 @@ namespace TED.Models.MetaData
         {
         }
 
+        public override string ToString()
+        {
+            return $"Status [{Status}] Directory [{ Directory }]";
+        }
+
         public DataToken? Artist { get; set; }
 
         public Image? ArtistThumbnail { get; set; }
@@ -24,6 +29,8 @@ namespace TED.Models.MetaData
         public Image? Thumbnail { get; set; }
 
         public double? Duration { get; set; }
+
+        public string? Directory { get; set; }
 
         public string DurationTime
         {

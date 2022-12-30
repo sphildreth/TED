@@ -17,48 +17,57 @@
     <MudProgressCircular Class="@(_scanning ? "visible" : "invisible")" Color="Color.Default" Indeterminate="true" />    
 </MudToolBar>
 
-@foreach (var release in _releases)
-{
-    @if(release.ReleaseData == null)
-    {
-        <h4>
-                release?.ToString()
-        </h4>
-    }
-    else
-    {
-        <MudCard Class="@($"status-{release.Status.ToString().ToLower()}")">
-            <MudCardHeader>
-                <CardHeaderAvatar>
-                    <MudAvatar Image=@($"data:image/jpeg;base64,{ Convert.ToBase64String(release.ArtistThumbnail?.Bytes ?? new byte[0])}")></MudAvatar>
-                </CardHeaderAvatar>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h4">@release.Artist?.Text</MudText>
-                    <MudText Typo="Typo.h5"><MudChip Variant="Variant.Text" Color="Color.Info">@release.Year</MudChip> @release.ReleaseData?.Text</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardMedia Image=@($"data:image/jpeg;base64,{ Convert.ToBase64String(release.Thumbnail?.Bytes ?? new byte[0])}") />
-            <MudCardContent>
-                @foreach(var media in release.Media ?? Enumerable.Empty<ReleaseMedia>())
-                {
-                    <MudText Typo="Typo.subtitle1">Media Number: @media.MediaNumber</MudText>
-                    @foreach (var track in media.Tracks)
-                    {
-                        <MudText Typo="Typo.body2"><MudChip Variant="Variant.Text" Color="Color.Primary">@track.TrackNumber</MudChip> @track.Title</MudText>
-                    }
-                }
-            </MudCardContent>
-            <MudCardActions>
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
-            </MudCardActions>
-        </MudCard>
-    }
-}
+<MudGrid>
+       @foreach (var release in _releases)
+        {
+            @if(release.ReleaseData == null)
+            {
+                <MudCard xs="4" Class="status-error py-4">
+                    <MudCardContent>
+                        <MudText Typo="Typo.body2">@release?.ToString()</MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
+                     </MudCardActions>
+                </MudCard>
+            }
+            else
+            {
+            <MudCard xs="4" Class="@($"status-{release.Status.ToString().ToLower()}" + " ma-2")">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Image=@($"data:image/jpeg;base64,{ Convert.ToBase64String(release.ArtistThumbnail?.Bytes ?? new byte[0])}")></MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                        <MudText Typo="Typo.subtitle1">@release.Artist?.Text</MudText>
+                        <MudText Typo="Typo.subtitle2"><MudChip Variant="Variant.Text" Color="Color.Info">@release.Year</MudChip> @release.ReleaseData?.Text</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardMedia class="pa-2" Height=200 Style="margin:auto;max-height:200px;width:200px;" Image=@($"data:image/jpeg;base64,{ Convert.ToBase64String(release.Thumbnail?.Bytes ?? new byte[0])}") />
+                    <MudCardContent>
+                        @foreach(var media in release.Media ?? Enumerable.Empty<ReleaseMedia>())
+                        {
+                            <MudText Typo="Typo.subtitle1">Media Number: @media.MediaNumber</MudText>
+                            @foreach (var track in media.Tracks)
+                            {
+                                <MudText Typo="Typo.body2"><MudChip Variant="Variant.Text" Color="Color.Primary">@track.TrackNumber</MudChip> @track.Title</MudText>
+                            }
+                        }
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
+                    </MudCardActions>
+                </MudCard>
+            }
+            _releaseProgress++;
+        }
+</MudGrid>
 
 @code {
     bool _scanning = false;
     IEnumerable<Release> _releases = Enumerable.Empty<Release>();
+    int _releaseProgress = 0;
 
     public Inbound()
     {            
@@ -68,6 +77,7 @@
     {
         if(!_scanning)
         {
+            _releaseProgress = 0;
             _scanning = true;
             var now = DateTime.UtcNow;
             var foundReleases = new List<Release>();

@@ -16,6 +16,7 @@ namespace TED.Processors
         {
             var allfileAtlsFound = new List<ATL.Track>();
             var release = new Release();
+            release.Directory = dir;
             foreach (var file in filesInDirectory)
             {
                 var fileAtl = new ATL.Track(file);
@@ -54,6 +55,7 @@ namespace TED.Processors
                             Value = SafeParser.ToToken(firstAtl.Genre),
                             Text = firstAtl.Genre
                         },
+                        Directory = dir,
                         CreatedDate = now,
                         Id = Guid.NewGuid(),
                         MediaCount = tagsFilesFound.Select(x => x.DiscNumber ?? 0).Distinct().Count(),
@@ -129,7 +131,7 @@ namespace TED.Processors
                 }
 
             }
-            return null;
+            return release;
         }
     }
 }
