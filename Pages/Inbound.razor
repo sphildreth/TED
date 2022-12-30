@@ -1,6 +1,9 @@
 @using TED.Models.MetaData;
 @using System.Text.Json
 @using Microsoft.Extensions.Configuration
+@using TED.Processors;
+@using TED.Utility;
+@using TED.Extensions;
 
 @inject IConfiguration Configuration
 
@@ -16,7 +19,7 @@
 
 @foreach (var release in _releases)
 {
-    @if(release.Release == null)
+    @if(release.ReleaseData == null)
     {
         <h4>
                 release?.ToString()
@@ -24,13 +27,30 @@
     }
     else
     {
-        <MudCard>
+        <MudCard Class="@($"status-{release.Status.ToString().ToLower()}")">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Image=@($"data:image/jpeg;base64,{ Convert.ToBase64String(release.ArtistThumbnail?.Bytes ?? new byte[0])}")></MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h4">@release.Artist?.Text</MudText>
+                    <MudText Typo="Typo.h5"><MudChip Variant="Variant.Text" Color="Color.Info">@release.Year</MudChip> @release.ReleaseData?.Text</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardMedia Image=@($"data:image/jpeg;base64,{ Convert.ToBase64String(release.Thumbnail?.Bytes ?? new byte[0])}") />
             <MudCardContent>
-                <MudText>@release.Release?.Text</MudText>
-                <MudText Typo="Typo.body2">The quick, brown fox jumps over a lazy dog.</MudText>
+                @foreach(var media in release.Media ?? Enumerable.Empty<ReleaseMedia>())
+                {
+                    <MudText Typo="Typo.subtitle1">Media Number: @media.MediaNumber</MudText>
+                    @foreach (var track in media.Tracks)
+                    {
+                        <MudText Typo="Typo.body2"><MudChip Variant="Variant.Text" Color="Color.Primary">@track.TrackNumber</MudChip> @track.Title</MudText>
+                    }
+                }
             </MudCardContent>
             <MudCardActions>
-                <MudButton Variant="Variant.Text" Color="Color.Primary">Learn More</MudButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
             </MudCardActions>
         </MudCard>
     }
@@ -38,7 +58,7 @@
 
 @code {
     bool _scanning = false;
-    IEnumerable<ReleaseList> _releases = Enumerable.Empty<ReleaseList>();
+    IEnumerable<Release> _releases = Enumerable.Empty<Release>();
 
     public Inbound()
     {            
@@ -49,22 +69,48 @@
         if(!_scanning)
         {
             _scanning = true;
-            var foundReleases = new List<ReleaseList>();
+            var now = DateTime.UtcNow;
+            var foundReleases = new List<Release>();
             var folderToScan = @Configuration["TED:InboundFolder"];
+            var directoryProcessor = new DirectoryProcessor();
             foreach(var dir in Directory.EnumerateDirectories(folderToScan))
             {
                 var jsonFileName = Path.Combine(dir, "ted.data.json");
                 if(File.Exists(jsonFileName))
                 {
                     var fileText = await System.IO.File.ReadAllTextAsync(jsonFileName);
-                    var release = JsonSerializer.Deserialize<ReleaseList>(fileText);
+                    var release = JsonSerializer.Deserialize<Release>(fileText);
                     if(release != null)
                     {
                         foundReleases.Add(release);
                     }
                 }
+                else
+                {
+                    var filesInDirectory = Directory.GetFiles(dir);
+                    if(filesInDirectory.Any())
+                    {
+                        var releaseForDirectory = directoryProcessor.Process(now, dir, filesInDirectory);
+                        if(releaseForDirectory != null)
+                        {
+                            foundReleases.Add(releaseForDirectory);
+                        }
+                    }
+                    foreach(var subDir in Directory.GetDirectories(dir, "*", SearchOption.AllDirectories))
+                    {
+                        var filesInSubDirectory = Directory.GetFiles(subDir);
+                        if (filesInSubDirectory.Any())
+                        {
+                            var releaseForDirectory = directoryProcessor.Process(now, subDir, filesInSubDirectory);
+                            if (releaseForDirectory != null)
+                            {
+                                foundReleases.Add(releaseForDirectory);
+                            }
+                        }
+                    }
+                }
             }
-            _releases = foundReleases.ToArray();
+            _releases = foundReleases.ToArray();         
             _scanning = false;
         }
     }

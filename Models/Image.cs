@@ -10,10 +10,6 @@ namespace TED.Models
         [MaxLength(100)]
         public string? Caption { get; set; }
 
-        public string? ThumbnailUrl { get; set; }
-
-        public string? Url { get; set; }
-
         public Image()
         {
         }

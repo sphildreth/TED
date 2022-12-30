@@ -11,8 +11,6 @@ namespace TED.Models
         /// </summary>
         public string? Text { get; set; }
 
-        public string? Tooltip { get; set; }
-
         /// <summary>
         /// This is the value to submit or the Key (Guid) of the item
         /// </summary>

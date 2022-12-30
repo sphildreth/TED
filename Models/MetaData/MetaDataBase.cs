@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using NodaTime;
+using System.ComponentModel.DataAnnotations;
 using TED.Utility;
 
 namespace TED.Models.MetaData
@@ -25,7 +25,5 @@ namespace TED.Models.MetaData
 
         [MaxLength(250)]
         public virtual string? SortName { get; set; }
-
-
     }
 }

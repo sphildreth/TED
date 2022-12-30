@@ -1,3 +1,4 @@
+using HashidsNet;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,6 +8,8 @@ namespace TED.Utility
 {
     public static class SafeParser
     {
+        private const string Salt = "9A0786D9-3DF7-4BE3-AB51-6E1CB91B028A";
+
         /// <summary>
         ///     Safely return a Boolean for a given Input.
         ///     <remarks>Has Additional String Operations</remarks>
@@ -105,7 +108,7 @@ namespace TED.Utility
         /// <summary>
         ///     Safely Return a Number For Given Input
         /// </summary>
-        public static T? ToNumber<T>(object input)
+        public static T? ToNumber<T>(object? input)
         {
             if (input == null) return default(T);
             try
@@ -163,6 +166,34 @@ namespace TED.Utility
             } 
             t = Nullable.GetUnderlyingType(t);
             return t == null ? default(T) : (T)Convert.ChangeType(value, t);
+        }
+
+        public static string ToToken(string input)
+        {
+            var hashids = new Hashids(Salt);
+            var numbers = 0;
+            var bytes = System.Text.Encoding.ASCII.GetBytes(input);
+            var looper = bytes.Length / 4;
+            for (var i = 0; i < looper; i++)
+            {
+                numbers += BitConverter.ToInt32(bytes, i * 4);
+            }
+            if (numbers < 0)
+            {
+                numbers *= -1;
+            }
+
+            return hashids.Encode(numbers);
+        }
+
+        public static string? ToFileNameFriendly(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return null;
+            }
+
+            return Regex.Replace(PathSanitizer.SanitizeFilename(input, ' ') ?? string.Empty, @"\s+", " ").Trim();
         }
     }
 }

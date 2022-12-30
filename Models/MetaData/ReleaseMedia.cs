@@ -4,14 +4,14 @@ using TED.Utility;
 namespace TED.Models.MetaData
 {
     [Serializable]
-    public sealed class ReleaseMediaList : MetaDataBase
+    public sealed class ReleaseMedia : MetaDataBase
     {
-        public ReleaseMediaList()
+        public ReleaseMedia()
             : base(null, null)
         {
         }
 
-        public ReleaseMediaList(IRandomNumber randomNumber, IClock clock)
+        public ReleaseMedia(IRandomNumber randomNumber, IClock clock)
             : base(randomNumber, clock)
         {
         }
@@ -22,6 +22,6 @@ namespace TED.Models.MetaData
 
         public int? TrackCount { get; set; }
 
-        public IEnumerable<TrackList> Tracks { get; set; } = Enumerable.Empty<TrackList>();
+        public IEnumerable<Track> Tracks { get; set; } = Enumerable.Empty<Track>();
     }
 }

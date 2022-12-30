@@ -5,31 +5,23 @@ using TED.Utility;
 namespace TED.Models.MetaData
 {
     [Serializable]
-    public sealed class ArtistList : MetaDataBase
+    public sealed class Artist : MetaDataBase
     {
-        public ArtistList()
+        public Artist()
             : base(null, null)
         {
         }
 
-        public ArtistList(IRandomNumber randomNumber, IClock clock)
+        public Artist(IRandomNumber randomNumber, IClock clock)
             : base(randomNumber, clock)
         {
         }
 
-        public DataToken? Artist { get; set; }
+        public DataToken? ArtistData { get; set; }
 
         public bool IsValid => Id != Guid.Empty;
 
-        public DateTime? LastPlayed { get; set; }
-
         public IEnumerable<string>? MissingReleasesForCollection { get; set; }
-
-        public int? PlayedCount { get; set; }
-
-        public double? Rank { get; set; }
-
-        public short? Rating { get; set; }
 
         public int? ReleaseCount { get; set; }
 

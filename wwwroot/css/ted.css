@@ -1,0 +1,3 @@
+﻿.status-incomplete, .status-missing {
+    border: solid 2px yellow;
+}
