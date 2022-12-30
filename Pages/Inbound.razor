@@ -6,6 +6,7 @@
 @using TED.Extensions;
 @inject IDialogService DialogService
 @inject IConfiguration Configuration
+@inject NavigationManager UriHelper
 
 @page "/inbound"
 
@@ -54,7 +55,7 @@
                     <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
                         <MudIconButton OnClick="@((e) => OpenReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" />
                         <MudIconButton OnClick="@((e) => DeleteReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
+                        <MudIconButton OnClick="@((e) => EditRelease(release))" Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
                     </MudButtonGroup>
                 </MudCardActions>
 
@@ -121,6 +122,11 @@
             Directory.Delete(dir, true);
             _releases.Remove(_releases.First(x => x.Directory == dir));
         }
+    }
+
+    void EditRelease(Release release)
+    {
+        UriHelper.NavigateTo($"/editrelease/{ System.Net.WebUtility.UrlEncode(release.Directory) }");
     }
 
     async Task DoScan()

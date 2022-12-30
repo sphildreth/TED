@@ -1,0 +1,10 @@
+﻿@page "/editrelease/{releaseDirectory}"
+
+<PageTitle>Editing Release</PageTitle>
+
+<h5>Editing @ReleaseDirectory</h5>
+
+@code {
+    [Parameter] 
+    public string ReleaseDirectory { get; set; }
+}
