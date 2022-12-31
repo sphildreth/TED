@@ -8,11 +8,11 @@ namespace TED.Models.MetaData
     public sealed class Release : MetaDataBase
     {
         public Release()
-            :base(null, null)
+            :this(null, null)
         {
         }
 
-        public Release(IRandomNumber randomNumber, IClock clock)
+        public Release(IRandomNumber? randomNumber, IClock? clock)
             : base(randomNumber, clock)
         {
         }
@@ -59,14 +59,26 @@ namespace TED.Models.MetaData
 
         public DataToken? ReleaseData { get; set; }
 
-        public string? ReleaseDate => ReleaseDateDateTime.HasValue
-            ? ReleaseDateDateTime.Value.ToUniversalTime().ToString("yyyy-MM-dd")
-            : null;
+        string? _releaseDate;
+        public string? ReleaseDate
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(_releaseDate))
+                {
+                    return _releaseDate;
+                }
+                return ReleaseDateDateTime.HasValue
+                        ? ReleaseDateDateTime.Value.ToUniversalTime().ToString("yyyy-MM-dd")
+                        : null;
+            }
+            set => _releaseDate = value;
+        }
 
         public int? Year { get; set; }
 
         [JsonIgnore]
-        public DateTime? ReleaseDateDateTime { get; set; }
+        public DateTime? ReleaseDateDateTime { get; set; } = DateTime.MinValue;
 
         public int? TrackCount { get; set; }
 

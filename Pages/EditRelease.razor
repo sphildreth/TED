@@ -1,10 +1,130 @@
 ﻿@page "/editrelease/{releaseDirectory}"
+@using TED.Models.MetaData;
+@using TED.Processors;
+@using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
 
 <PageTitle>Editing Release</PageTitle>
 
 <h5>Editing @ReleaseDirectory</h5>
 
+@using FluentValidation
+
+<MudCard>
+    <MudForm Model="@_release" @ref="@form" Validation="@(releaseValidator.ValidateValue)" ValidationDelay="0">
+        <MudCardContent>
+            <MudTextField @bind-Value="_release.ReleaseData.Text"
+                          For="@(() => _release.ReleaseData.Text)"
+                          Immediate="true"
+                          Label="Release Title" />
+            <MudDatePicker @bind-Date="_release.ReleaseDateDateTime"
+                           For="@(() => _release.ReleaseDateDateTime)"
+                           Label="Release Date" 
+                           DateFormat="yyyy-MM-dd" />
+            <MudTextField @bind-Value="_release.Artist.Text"
+                          For="@(() => _release.Artist.Text)"
+                          Immediate="true"
+                          Label="Artist Name" />
+
+
+        </MudCardContent>
+    </MudForm>
+    <MudCardActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="@(async () => await Submit())">Save</MudButton>
+    </MudCardActions>
+</MudCard>
+
 @code {
+    [Inject] 
+    ISnackbar Snackbar { get; set; }
+    bool success;
+    string[] errors = { };
+    MudForm form;
+    ReleaseFluentValidator releaseValidator = new ReleaseFluentValidator();
+
+    Release _release;
+
+
+//    OrderDetailsModelFluentValidator orderDetailsValidator = new OrderDetailsModelFluentValidator();
+
+    private async Task Submit()
+    {
+        await form.Validate();
+
+        if (form.IsValid)
+        {
+            Snackbar.Add("Submited!");
+        }
+    }
+
+    /// <summary>
+    /// A standard AbstractValidator which contains multiple rules and can be shared with the back end API
+    /// </summary>
+    /// <typeparam name="Release"></typeparam>
+    public class ReleaseFluentValidator : AbstractValidator<Release>
+    {
+        public ReleaseFluentValidator()
+        {
+            RuleFor(x => x.ReleaseData.Text)
+                .NotEmpty()
+                .Length(1, 250);
+
+            RuleFor(x => x.Artist.Text)
+                .NotEmpty()
+                .Length(1, 250);
+
+            //RuleFor(x => x.Email)
+            //    .Cascade(CascadeMode.Stop)
+            //    .NotEmpty()
+            //    .EmailAddress()
+            //    .MustAsync(async (value, cancellationToken) => await IsUniqueAsync(value));
+
+            //RuleFor(x => x.CCNumber)
+            //    .NotEmpty()
+            //    .Length(1, 100)
+            //    .CreditCard();
+
+            //RuleFor(x => x.Address.Address)
+            //    .NotEmpty()
+            //    .Length(1, 100);
+
+            //RuleFor(x => x.Address.City)
+            //    .NotEmpty()
+            //    .Length(1, 100);
+
+            //RuleFor(x => x.Address.Country)
+            //    .NotEmpty()
+            //    .Length(1, 100);
+
+            //RuleForEach(x => x.OrderDetails)
+            //    .SetValidator(new OrderDetailsModelFluentValidator());
+        }
+
+       public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>
+        {
+            var result = await ValidateAsync(ValidationContext<Release>.CreateWithOptions((Release)model, x => x.IncludeProperties(propertyName)));
+            if (result.IsValid)
+            {
+                return Array.Empty<string>();
+            }
+            return result.Errors.Select(e => e.ErrorMessage);
+        };
+    }
+
     [Parameter] 
     public string ReleaseDirectory { get; set; }
+
+    public async Task DoSave()
+    {
+        
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ReleaseDirectory = System.Net.WebUtility.UrlDecode(ReleaseDirectory);
+        var directoryProcessor = new DirectoryProcessor();
+        _release = await directoryProcessor.ProcessAsync(DateTime.UtcNow, ReleaseDirectory, Directory.GetFiles(ReleaseDirectory));
+        _release.ReleaseDateDateTime = DateTime.Parse(_release.ReleaseDate);
+    }
+
 }
