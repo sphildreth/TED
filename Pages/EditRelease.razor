@@ -6,7 +6,16 @@
 
 <PageTitle>Editing Release</PageTitle>
 
-<h5>Editing @ReleaseDirectory</h5>
+<div Class="d-flex flex-wrap">
+    <MudText Class="mt-4">Editing Directory: @ReleaseDirectory</MudText>
+    <MudSpacer />
+    <MudBadge Dot="true" Color="@( _release.Status == Enums.Statuses.Ok ? Color.Success : Color.Error )" Class="mx-6 my-4">
+        <MudText>Release Status</MudText>
+    </MudBadge>
+</div>
+
+
+
 
 @using FluentValidation
 

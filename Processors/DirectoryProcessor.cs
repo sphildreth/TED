@@ -245,7 +245,7 @@ namespace TED.Processors
                             ));
                         releaseData.ProcessingMessages.Add(new ProcessMessage
                             (
-                                $"Releae {(releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? "does not " : "does")} need editing",
+                                $"Release {(releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? "does not " : "does")} need editing",
                                 releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok,
                                 releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
                             ));
