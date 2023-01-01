@@ -28,5 +28,10 @@ namespace TED.Models.MetaData
         public int? TrackCount { get; set; }
 
         public IEnumerable<Track> Tracks { get; set; } = Enumerable.Empty<Track>();
+
+        public override string ToString()
+        {
+            return $"MediaNumber [{ MediaNumber}] TrackCount [{ TrackCount}]";
+        }
     }
 }

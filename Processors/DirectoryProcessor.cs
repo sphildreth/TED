@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using Microsoft.VisualBasic;
+using System.Net.NetworkInformation;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using TED.Enums;
 using TED.Extensions;
@@ -10,6 +12,7 @@ namespace TED.Processors
 {
     public sealed class DirectoryProcessor
     {
+
         private static readonly Regex _hasFeatureFragmentsRegex = new(@"\((ft.|feat.|featuring|feature)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\\s*(-\\s)*((CD[_\-#\s]*[0-9]*)))|((\\(|\\[)+([0-9]|,|self|bonus|re(leas|master|(e|d)*)*|th|anniversary|cd|disc|deluxe|dig(ipack)*|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|\\s)+(]|\\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -29,234 +32,312 @@ namespace TED.Processors
             string? directoryM3UFile = null;
             var release = new Release();
             release.Directory = dir;
-            foreach (var file in filesInDirectory)
+
+            try
             {
-                var fileAtl = new ATL.Track(file);
-                if (fileAtl != null)
+                foreach (var file in filesInDirectory)
                 {
-                    allfileAtlsFound.Add(fileAtl);
+                    var fileAtl = new ATL.Track(file);
+                    if (fileAtl != null)
+                    {
+                        allfileAtlsFound.Add(fileAtl);
+                    }
+                    if (string.Equals(Path.GetExtension(file), ".sfv", StringComparison.OrdinalIgnoreCase))
+                    {
+                        directorySFVFile = file;
+                    }
+                    if (string.Equals(Path.GetExtension(file), ".m3u", StringComparison.OrdinalIgnoreCase))
+                    {
+                        directoryM3UFile = file;
+                    }
                 }
-                if (string.Equals(Path.GetExtension(file), ".sfv", StringComparison.OrdinalIgnoreCase))
+                if (allfileAtlsFound.Any(x => x.AudioFormat.ID > -1))
                 {
-                    directorySFVFile = file;
-                }
-                if (string.Equals(Path.GetExtension(file), ".m3u", StringComparison.OrdinalIgnoreCase))
-                {
-                    directoryM3UFile = file;
-                }
-            }
-            if (allfileAtlsFound.Any(x => x.AudioFormat.ID > -1))
-            {
-                var tagsFilesFound = allfileAtlsFound.Where(x => x.AudioFormat.ID > -1 && x.Duration > 0);
-                var filesAtlsGroupedByRelease = tagsFilesFound.GroupBy(x => x.Album);
-                foreach (var groupedByRelease in filesAtlsGroupedByRelease)
-                {
-                    var firstAtl = groupedByRelease.First();
-                    DateTime? releaseDate = null;
-                    var releaseYear = groupedByRelease.Where(x => x.Year > 0).FirstOrDefault()?.Year;
-                    if (releaseYear.HasValue && releaseYear > 0)
+                    var tagsFilesFound = allfileAtlsFound.Where(x => x.AudioFormat.ID > -1 && x.Duration > 0);
+                    var filesAtlsGroupedByRelease = tagsFilesFound.GroupBy(x => x.Album);
+                    foreach (var groupedByRelease in filesAtlsGroupedByRelease)
                     {
-                        releaseDate = new DateTime(releaseYear.Value, 1, 1);
-                    }
-                    var releaseData = new Release
-                    {
-                        Artist = new Models.DataToken
+                        var firstAtl = groupedByRelease.First();
+                        DateTime? releaseDate = null;
+                        var releaseYear = groupedByRelease.Where(x => x.Year > 0).FirstOrDefault()?.Year;
+                        if (releaseYear.HasValue && releaseYear > 0)
                         {
-                            Value = SafeParser.ToToken(firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist),
-                            Text = firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist
-                        },
-                        ReleaseData = new Models.DataToken
+                            releaseDate = new DateTime(releaseYear.Value, 1, 1);
+                        }
+                        var releaseData = new Release
                         {
-                            Value = SafeParser.ToToken(groupedByRelease.Key),
-                            Text = groupedByRelease.Key
-                        },
-                        Genre = firstAtl.Genre.Nullify() == null ? null : new Models.DataToken
-                        {
-                            Value = SafeParser.ToToken(firstAtl.Genre),
-                            Text = firstAtl.Genre
-                        },
-                        Directory = dir,
-                        CreatedDate = now,
-                        Id = Guid.NewGuid(),
-                        MediaCount = tagsFilesFound.Select(x => x.DiscNumber ?? 0).Distinct().Count(),
-                        ReleaseDateDateTime = releaseDate,
-                        Year = releaseDate?.Year,
-                        Status = Enums.Statuses.New,
-                        TrackCount = groupedByRelease.First().TrackTotal
-                    };
-                    var firstAtlHasArtistImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Artist ||
-                                                                                                x.PicType == ATL.PictureInfo.PIC_TYPE.Band);
-                    if (firstAtlHasArtistImage != null)
-                    {
-                        releaseData.ArtistThumbnail = new Models.Image
-                        {
-                            Bytes = firstAtlHasArtistImage.PictureData,
-                            Caption = firstAtlHasArtistImage.Description
-                        };
-                    }
-                    else
-                    {
-                        releaseData.ArtistThumbnail = await FirstArtistImageInDirectory(dir, filesInDirectory);
-                    }
-                    var firstAtlHasReleaseImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Front ||
-                                                                                                 x.PicType == ATL.PictureInfo.PIC_TYPE.Generic);
-                    if (firstAtlHasReleaseImage != null)
-                    {
-                        releaseData.CoverImage = new Models.Image
-                        {
-                            Bytes = firstAtlHasReleaseImage.PictureData,
-                            Caption = firstAtlHasReleaseImage.Description
-                        };
-                    }
-                    else
-                    {
-                        releaseData.CoverImage = await FirstReleaseImageInDirectory(dir, filesInDirectory);
-                    }
-                    if (releaseData.CoverImage == null)
-                    {
-                        releaseData.CoverImage = new Models.Image
-                        {
-                            Bytes = Convert.FromBase64String(ImageNotFound)
-                        };
-                        releaseData.Status = Statuses.Incomplete;
-                    }
-                    var medias = new List<ReleaseMedia>();
-                    foreach (var mp3TagData in tagsFilesFound.GroupBy(x => x.DiscNumber))
-                    {
-                        var mediaTracks = tagsFilesFound.Where(x => x.DiscNumber == mp3TagData.Key);
-                        var mediaNumber = SafeParser.ToNumber<short?>(mp3TagData.Key) ?? 0;
-                        medias.Add(new ReleaseMedia
-                        {
-                            MediaNumber = mediaNumber < 1 ? SafeParser.ToNumber<short>(1) : mediaNumber,
-                            TrackCount = mediaTracks.Count(),
-                            SubTitle = mp3TagData.First().SeriesTitle,
-                            Tracks = mediaTracks.OrderBy(x => x.TrackNumber).Select(x => new Track
+                            Artist = new Models.DataToken
                             {
-                                CreatedDate = x.FileInfo().CreationTimeUtc,
-                                LastUpdated = x.FileInfo().LastWriteTimeUtc,
-                                Duration = x.DurationMs,
-                                FileHash = HashHelper.GetHash(x.FileInfo().FullName).ToString(),
-                                FileName = x.FileInfo().FullName,
-                                FileSize = SafeParser.ToNumber<int?>(x.FileInfo().Length),
-                                Id = Guid.NewGuid(),
-                                Status = (x.FileInfo()?.Exists ?? false) ? Statuses.New : Statuses.Missing,
-                                Title = x.Title,
-                                TrackArtist = string.IsNullOrWhiteSpace(x.Artist) || string.Equals(releaseData.Artist.Value, x.Artist, StringComparison.OrdinalIgnoreCase) ? null : new Artist
+                                Value = SafeParser.ToToken(firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist),
+                                Text = firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist
+                            },
+                            ReleaseData = new Models.DataToken
+                            {
+                                Value = SafeParser.ToToken(groupedByRelease.Key),
+                                Text = groupedByRelease.Key
+                            },
+                            Genre = firstAtl.Genre.Nullify() == null ? null : new Models.DataToken
+                            {
+                                Value = SafeParser.ToToken(firstAtl.Genre),
+                                Text = firstAtl.Genre
+                            },
+                            Directory = dir,
+                            CreatedDate = now,
+                            Id = Guid.NewGuid(),
+                            MediaCount = tagsFilesFound.Select(x => x.DiscNumber ?? 0).Distinct().Count(),
+                            ReleaseDateDateTime = releaseDate,
+                            Year = releaseDate?.Year,
+                            Status = Enums.Statuses.New,
+                            TrackCount = groupedByRelease.First().TrackTotal
+                        };
+                        var firstAtlHasArtistImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Artist ||
+                                                                                                    x.PicType == ATL.PictureInfo.PIC_TYPE.Band);
+
+                        if (firstAtlHasArtistImage != null)
+                        {
+                            releaseData.ArtistThumbnail = new Models.Image
+                            {
+                                Bytes = firstAtlHasArtistImage.PictureData,
+                                Caption = firstAtlHasArtistImage.Description
+                            };
+                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Set ArtistThumbnail to ID3 found picture."));
+                        }
+                        else
+                        {
+                            var artistThumbnailData = await FirstArtistImageInDirectory(dir, filesInDirectory);
+                            releaseData.ArtistThumbnail = artistThumbnailData.Item1;
+                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{ artistThumbnailData.Item2 }] number of Artist images.", artistThumbnailData.Item2 > 0, artistThumbnailData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
+                        }
+                        var firstAtlHasReleaseImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Front ||
+                                                                                                     x.PicType == ATL.PictureInfo.PIC_TYPE.Generic);
+                        if (firstAtlHasReleaseImage != null)
+                        {
+                            releaseData.CoverImage = new Models.Image
+                            {
+                                Bytes = firstAtlHasReleaseImage.PictureData,
+                                Caption = firstAtlHasReleaseImage.Description
+                            };
+                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Set CoverImage to ID3 found picture."));
+                        }
+                        else
+                        {
+                            var releaseCoverImageData = await FirstReleaseImageInDirectory(dir, filesInDirectory);
+                            releaseData.CoverImage = releaseCoverImageData.Item1;
+                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{releaseCoverImageData.Item2}] number of Release images.", releaseCoverImageData.Item2 > 0, releaseCoverImageData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
+                        }
+                        if (releaseData.CoverImage == null)
+                        {
+                            releaseData.CoverImage = new Models.Image
+                            {
+                                Bytes = Convert.FromBase64String(ImageNotFound)
+                            };
+                            releaseData.Status = Statuses.Incomplete;
+                            releaseData.ProcessingMessages.Add(new ProcessMessage("CoverImage not found.", false, ProcessMessage.BadCheckMark));
+                        }
+                        var medias = new List<ReleaseMedia>();
+                        foreach (var mp3TagData in tagsFilesFound.GroupBy(x => x.DiscNumber))
+                        {
+                            var mediaTracks = tagsFilesFound.Where(x => x.DiscNumber == mp3TagData.Key);
+                            var mediaNumber = SafeParser.ToNumber<short?>(mp3TagData.Key) ?? 0;
+                            medias.Add(new ReleaseMedia
+                            {
+                                MediaNumber = mediaNumber < 1 ? SafeParser.ToNumber<short>(1) : mediaNumber,
+                                TrackCount = mediaTracks.Count(),
+                                SubTitle = mp3TagData.First().SeriesTitle,
+                                Tracks = mediaTracks.OrderBy(x => x.TrackNumber).Select(x => new Track
                                 {
-                                    ArtistData = new Models.DataToken
+                                    CreatedDate = x.FileInfo().CreationTimeUtc,
+                                    LastUpdated = x.FileInfo().LastWriteTimeUtc,
+                                    Duration = x.DurationMs,
+                                    FileHash = HashHelper.GetHash(x.FileInfo().FullName).ToString(),
+                                    FileName = x.FileInfo().FullName,
+                                    FileSize = SafeParser.ToNumber<int?>(x.FileInfo().Length),
+                                    Id = Guid.NewGuid(),
+                                    Status = (x.FileInfo()?.Exists ?? false) ? Statuses.New : Statuses.Missing,
+                                    Title = x.Title,
+                                    TrackArtist = string.IsNullOrWhiteSpace(x.Artist) || string.Equals(releaseData.Artist.Value, x.Artist, StringComparison.OrdinalIgnoreCase) ? null : new Artist
                                     {
-                                        Value = SafeParser.ToToken(x.Artist),
-                                        Text = x.Artist
-                                    }
-                                },
-                                TrackNumber = x.TrackNumber
-                            }).ToArray()
-                        });
-                    }
-                    releaseData.Media = medias;
-                    releaseData.TrackCount = medias.Sum(x => x.TrackCount);
-                    releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Count() == releaseData.Media.Sum(x => x.TrackCount) ? Enums.Statuses.Ok : Enums.Statuses.Incomplete;
-                    releaseData.Duration = medias.SelectMany(x => x.Tracks).Sum(x => x.Duration);
-                    if (releaseData.Status == Enums.Statuses.Ok && directorySFVFile.Nullify() != null)
-                    {
-                        if (releaseData.TrackCount != await GetMp3CountFromSFVFile(directorySFVFile))
-                        {
-                            releaseData.Status = Enums.Statuses.Incomplete;
+                                        ArtistData = new Models.DataToken
+                                        {
+                                            Value = SafeParser.ToToken(x.Artist),
+                                            Text = x.Artist
+                                        }
+                                    },
+                                    TrackNumber = x.TrackNumber
+                                }).ToArray()
+                            });
                         }
-                    }
-                    if (releaseData.Status == Enums.Statuses.Ok && directoryM3UFile.Nullify() != null)
-                    {
-                        if (releaseData.TrackCount != await GetMp3CountFromM3UFile(directoryM3UFile))
+                        releaseData.Media = medias;
+                        releaseData.TrackCount = medias.Sum(x => x.TrackCount);
+                        releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Count() == releaseData.Media.Sum(x => x.TrackCount) ? Enums.Statuses.Ok : Enums.Statuses.Incomplete;
+                        releaseData.Duration = medias.SelectMany(x => x.Tracks).Sum(x => x.Duration);
+                        if (releaseData.Status == Enums.Statuses.Ok && directorySFVFile.Nullify() != null)
                         {
-                            releaseData.Status = Enums.Statuses.Incomplete;
-                        }
-                    }
-                    foreach (var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v, i) => new { i, v }))
-                    {
-                        foreach (var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
-                        {
-                            track.t.Status = CheckTrackStatus(track.t);
-                            if (track.t.TrackNumber != track.i + 1)
+                            var doesTrackCountMatchSFVCount = releaseData.TrackCount == await GetMp3CountFromSFVFile(directorySFVFile);
+                            if (!doesTrackCountMatchSFVCount)
                             {
-                                track.t.Status = Statuses.NeedsAttention;
+                                releaseData.Status = Enums.Statuses.Incomplete;
+                            }
+                            releaseData.ProcessingMessages.Add(new ProcessMessage("Checked TrackCount with SFV", doesTrackCountMatchSFVCount, doesTrackCountMatchSFVCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
+                        }
+                        if (releaseData.Status == Enums.Statuses.Ok && directoryM3UFile.Nullify() != null)
+                        {
+                            var doesTrackCountMatchM3UCount = releaseData.TrackCount == await GetMp3CountFromM3UFile(directoryM3UFile);
+                            if (!doesTrackCountMatchM3UCount)
+                            {
+                                releaseData.Status = Enums.Statuses.Incomplete;
+                            }
+                            releaseData.ProcessingMessages.Add(new ProcessMessage("Checked TrackCount with M3U", doesTrackCountMatchM3UCount, doesTrackCountMatchM3UCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
+                        }
+                        foreach (var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v, i) => new { i, v }))
+                        {
+                            foreach (var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
+                            {
+                                var trackStatusCheckData = CheckTrackStatus(track.t);
+                                track.t.Status = trackStatusCheckData.Item1;
+                                if (track.t.TrackNumber != track.i + 1)
+                                {
+                                    track.t.Status = Statuses.NeedsAttention;
+                                    releaseData.ProcessingMessages.Add(new ProcessMessage ($"Track [{ track.t.ToString() }] TrackNumber expected [{ track.i + 1 }] found [{ track.t.TrackNumber }]", false, ProcessMessage.BadCheckMark));
+                                }
+                                if (trackStatusCheckData.Item2 != null)
+                                {
+                                    releaseData.ProcessingMessages.AddRange(trackStatusCheckData.Item2);
+                                }
+                            }
+                            if (media.v.MediaNumber != media.i + 1)
+                            {
+                                releaseData.Status = Statuses.NeedsAttention;
+                                releaseData.ProcessingMessages.Add(new ProcessMessage($"Media [{media.v.ToString()}] MediaNumber expected [{media.i + 1}] found [{media.v.MediaNumber}]", false, ProcessMessage.BadCheckMark));
                             }
                         }
-                        if (media.v.MediaNumber != media.i + 1)
+                        releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Any(x => x.Status != Statuses.New) ? Statuses.NeedsAttention : releaseData.Status;
+                        if (releaseData.Status == Statuses.Ok)
                         {
-                            releaseData.Status = Statuses.NeedsAttention;
+                            var releaseStatusCheckData = CheckReleaseStatus(releaseData);
+                            releaseData.Status = releaseStatusCheckData.Item1;
+                            if(releaseStatusCheckData.Item2 != null)
+                            {
+                                releaseData.ProcessingMessages.AddRange(releaseStatusCheckData.Item2);
+                            }
                         }
+                        var roadieDataFileName = Path.Combine(dir, $"ted.data.json");
+                        System.IO.File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(releaseData));
+
+                        releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage($"Creation Date [{releaseData.CreatedDate}]"));
+                        releaseData.ProcessingMessages.Add(new ProcessMessage
+                            (
+                                "Duration is acceptable.",
+                                releaseData.Duration > 0,
+                                releaseData.Duration > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                            ));
+                        releaseData.ProcessingMessages.Add(new ProcessMessage
+                            (
+                                "Media count is acceptable",
+                                releaseData.MediaCount > 0,
+                                releaseData.MediaCount > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                            ));
+                        releaseData.ProcessingMessages.Add(new ProcessMessage
+                            (
+                                $"Release is { (releaseData.IsValid ? "valid" : "invalid") }",
+                                releaseData.IsValid,
+                                releaseData.IsValid ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                            ));
+                        releaseData.ProcessingMessages.Add(new ProcessMessage
+                            (
+                                $"Releae {(releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? "does not " : "does")} need editing",
+                                releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok,
+                                releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                            ));
+                        releaseData.ProcessingMessages.Add(new ProcessMessage
+                            (
+                                $"Status is {(releaseData.Status == Statuses.Ok ? "acceptable" : "not acceptable")}",
+                                releaseData.Status == Statuses.Ok,
+                                releaseData.Status == Statuses.Ok ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                            ));
+                        releaseData.ProcessingMessages.Add(new ProcessMessage
+                            (
+                                "Track count is acceptable",
+                                releaseData.TrackCount > 0,
+                                releaseData.TrackCount > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                            ));
+                        releaseData.ProcessingMessages.Add(new ProcessMessage
+                            (
+                                "Year is acceptable",
+                                releaseData.Year > 0,
+                                releaseData.Year > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                            ));
+
+                        return releaseData;
                     }
-                    releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Any(x => x.Status != Statuses.New) ? Statuses.NeedsAttention : releaseData.Status;
-                    if (releaseData.Status == Statuses.Ok)
-                    {
-                        releaseData.Status = CheckReleaseStatus(releaseData);
-                    }
-                    var roadieDataFileName = Path.Combine(dir, $"ted.data.json");
-                    System.IO.File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(releaseData));
-                    return releaseData;
                 }
+
+            }
+            catch (Exception ex)
+            {
+                release.ProcessingMessages.Add(new ProcessMessage(ex));
             }
             return release;
         }
 
-        private static async Task<Image?> FirstArtistImageInDirectory(string dir, string[] filesInDirectory)
+        private static async Task<(Image?, int, int)> FirstArtistImageInDirectory(string dir, string[] filesInDirectory)
         {
             var artistImagesInFolder = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Artist, SearchOption.TopDirectoryOnly);
             if (artistImagesInFolder?.Any() ?? false)
             {
-                return new Image
+                return (new Image
                 {
                     Bytes = await File.ReadAllBytesAsync(artistImagesInFolder.First().FullName)
-                };
+                }, artistImagesInFolder.Count(), 0);
             }
             var secondaryArtistImagesInFolder = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.ArtistSecondary, SearchOption.TopDirectoryOnly);
             if (secondaryArtistImagesInFolder?.Any() ?? false)
             {
-                return new Image
+                return (new Image
                 {
                     Bytes = await File.ReadAllBytesAsync(secondaryArtistImagesInFolder.First().FullName)
-                };
+                }, 0, secondaryArtistImagesInFolder.Count());
             }
-            return null;
+            return (null, 0, 0);
         }
 
-        private static async Task<Image?> FirstReleaseImageInDirectory(string dir, string[] filesInDirectory)
+        private static async Task<(Image?, int, int)> FirstReleaseImageInDirectory(string dir, string[] filesInDirectory)
         {
             var releasetImagesInFolder = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Release, SearchOption.TopDirectoryOnly);
             if (releasetImagesInFolder?.Any() ?? false)
             {
-                return new Image
+                return (new Image
                 {
                     Bytes = await File.ReadAllBytesAsync(releasetImagesInFolder.First().FullName)
-                };
+                }, releasetImagesInFolder.Count(), 0);
             }
             var secondaryReleaseImagesInFolder = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
             if (secondaryReleaseImagesInFolder?.Any() ?? false)
             {
-                return new Image
+                return (new Image
                 {
                     Bytes = await File.ReadAllBytesAsync(secondaryReleaseImagesInFolder.First().FullName)
-                };
+                }, 0, secondaryReleaseImagesInFolder.Count());
             }
-            return null;
+            return (null, 0, 0);
         }
 
-        private static Statuses CheckReleaseStatus(Release release)
+        private static (Statuses, IEnumerable<ProcessMessage>?) CheckReleaseStatus(Release release)
         {
             if (ReleaseHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty))
             {
-                return Statuses.NeedsAttention;
+                return (Statuses.NeedsAttention, new List<ProcessMessage> { ProcessMessage.MakeBadMessage($"Release [{ release }] Title has unwanted text.") });
             }
-            return release?.Status ?? Statuses.NeedsAttention;
+            return (release?.Status ?? Statuses.NeedsAttention, null);
         }
 
-        private static Statuses CheckTrackStatus(Track track)
+        private static (Statuses, IEnumerable<ProcessMessage>?) CheckTrackStatus(Track track)
         {
             if (TrackHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(track?.Title ?? string.Empty))
             {
-                return Statuses.NeedsAttention;
+                return (Statuses.NeedsAttention, new List<ProcessMessage> { ProcessMessage.MakeBadMessage($"Track [{ track }] Title has unwanted text.") });
             }
-            return track?.Status ?? Statuses.Missing;
+            return (track?.Status ?? Statuses.Missing, null);
         }
 
         private static bool TrackHasFeaturingFragments(string input)

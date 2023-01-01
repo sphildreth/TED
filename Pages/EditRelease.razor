@@ -10,29 +10,52 @@
 
 @using FluentValidation
 
-<MudCard>
-    <MudForm Model="@_release" @ref="@form" Validation="@(releaseValidator.ValidateValue)" ValidationDelay="0">
-        <MudCardContent>
-            <MudTextField @bind-Value="_release.ReleaseData.Text"
-                          For="@(() => _release.ReleaseData.Text)"
-                          Immediate="true"
-                          Label="Release Title" />
-            <MudDatePicker @bind-Date="_release.ReleaseDateDateTime"
-                           For="@(() => _release.ReleaseDateDateTime)"
-                           Label="Release Date" 
-                           DateFormat="yyyy-MM-dd" />
-            <MudTextField @bind-Value="_release.Artist.Text"
-                          For="@(() => _release.Artist.Text)"
-                          Immediate="true"
-                          Label="Artist Name" />
-
-
-        </MudCardContent>
-    </MudForm>
-    <MudCardActions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="@(async () => await Submit())">Save</MudButton>
-    </MudCardActions>
-</MudCard>
+<MudGrid>
+    <MudItem xs="8">
+        <MudCard>
+            <MudForm Model="@_release" @ref="@form" Validation="@(releaseValidator.ValidateValue)" ValidationDelay="0">
+                <MudCardContent>
+                    <MudTextField @bind-Value="_release.Artist.Text"
+                                  For="@(() => _release.Artist.Text)"
+                                  Immediate="true"
+                                  Label="Artist Name" />
+                    <MudTextField @bind-Value="_release.ReleaseData.Text"
+                                  For="@(() => _release.ReleaseData.Text)"
+                                  Immediate="true"
+                                  Label="Release Title" />
+                    <MudDatePicker @bind-Date="_release.ReleaseDateDateTime"
+                                   For="@(() => _release.ReleaseDateDateTime)"
+                                   Label="Release Date"
+                                   DateFormat="yyyy-MM-dd" />
+                </MudCardContent>
+            </MudForm>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="@(async () => await Submit())">Save</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="4">
+        <MudSimpleTable Style="pa-4 overflow-x: auto;">
+            <thead>
+                <tr>
+                    @foreach (var h in messageHeadings)
+                    {
+                        <th>@h</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                 @foreach (var message in _release.ProcessingMessages.OrderBy(x => x.IsOK).ThenBy(x => x.Message))
+                {
+                    <tr style="@($"message-ok-{ ( message.IsOK ? "1" : "0" )}")">
+                        <td>@message.StatusIndicator</td>
+                        <td>@message.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudItem>
+</MudGrid>
 
 @code {
     [Inject] 
@@ -41,11 +64,16 @@
     string[] errors = { };
     MudForm form;
     ReleaseFluentValidator releaseValidator = new ReleaseFluentValidator();
+    string[] messageHeadings = { "Type", "Details" };
 
-    Release _release;
+    Release _release = new Release
+        {
+            Artist = new Models.DataToken(),
+            ReleaseData = new Models.DataToken(),
+        };
 
 
-//    OrderDetailsModelFluentValidator orderDetailsValidator = new OrderDetailsModelFluentValidator();
+    //    OrderDetailsModelFluentValidator orderDetailsValidator = new OrderDetailsModelFluentValidator();
 
     private async Task Submit()
     {
@@ -100,15 +128,15 @@
             //    .SetValidator(new OrderDetailsModelFluentValidator());
         }
 
-       public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>
-        {
-            var result = await ValidateAsync(ValidationContext<Release>.CreateWithOptions((Release)model, x => x.IncludeProperties(propertyName)));
-            if (result.IsValid)
-            {
-                return Array.Empty<string>();
-            }
-            return result.Errors.Select(e => e.ErrorMessage);
-        };
+        public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>
+         {
+             var result = await ValidateAsync(ValidationContext<Release>.CreateWithOptions((Release)model, x => x.IncludeProperties(propertyName)));
+             if (result.IsValid)
+             {
+                 return Array.Empty<string>();
+             }
+             return result.Errors.Select(e => e.ErrorMessage);
+         };
     }
 
     [Parameter] 
@@ -116,8 +144,9 @@
 
     public async Task DoSave()
     {
-        
+
     }
+
 
     protected override async Task OnInitializedAsync()
     {

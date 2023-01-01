@@ -50,5 +50,10 @@ namespace TED.Models.MetaData
         public Artist? TrackArtist { get; set; }
 
         public int? TrackNumber { get; set; }
+
+        public override string ToString()
+        {
+            return $"TrackNumber [{TrackNumber}] Duration [{Duration}] FileSize [{FileSize}] Title [{Title}]";
+        }
     }
 }
