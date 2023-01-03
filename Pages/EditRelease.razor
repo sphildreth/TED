@@ -15,8 +15,6 @@
 </div>
 
 
-
-
 @using FluentValidation
 
 <MudGrid>
@@ -36,6 +34,57 @@
                                    For="@(() => _release.ReleaseDateDateTime)"
                                    Label="Release Date"
                                    DateFormat="yyyy-MM-dd" />
+                    <MudSimpleTable Style="pa-4 overflow-x: auto;0" Hover="true" Striped="true">
+                    <colgroup>
+                       <col span="1" style="width: 15%;">
+                       <col span="1" style="width: 15%;">
+                       <col span="1" style="width: 20%;">
+                       <col span="1" style="width: 50%;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Media Number</th>
+                            <th>Track Number</th>
+                            <th>Track Artist Name</th>
+                            <th>Title</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var media in _release.Media.OrderBy(x => x.MediaNumber))
+                        {
+                            @foreach (var track in media.Tracks.OrderBy(x => x.TrackNumber))
+                            {
+                                <tr>
+                                    <td>
+                                            <MudNumericField T="short?" @bind-Value="@media.MediaNumber"
+                                                  For="@(() => @media.MediaNumber)"
+                                                  Min="1"
+                                                  Max="500"
+                                                  Immediate="true" />
+
+                                    </td>
+                                    <td>
+                                            <MudNumericField @bind-Value="@track.TrackNumber"
+                                                  For="@(() => @track.TrackNumber)"
+                                                     Min="1"
+                                                     Max="1000"
+                                                  Immediate="true"/>
+                                    </td>
+                                        <td>
+                                            <MudTextField @bind-Value="@track.TrackArtist.ArtistData.Text"
+                                                  For="@(() => @track.TrackArtist.ArtistData.Text)"
+                                                  Immediate="true" />
+                                        </td>
+                                    <td>
+                                            <MudTextField @bind-Value="@track.Title"
+                                                  For="@(() => @track.Title)"
+                                                      Immediate="true"/>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </MudSimpleTable>
                 </MudCardContent>
             </MudForm>
             <MudCardActions>
@@ -54,7 +103,7 @@
                 </tr>
             </thead>
             <tbody>
-                 @foreach (var message in _release.ProcessingMessages.OrderBy(x => x.IsOK).ThenBy(x => x.Message))
+                @foreach (var message in _release.ProcessingMessages.OrderBy(x => x.IsOK).ThenBy(x => x.Message))
                 {
                     <tr style="@($"message-ok-{ ( message.IsOK ? "1" : "0" )}")">
                         <td>@message.StatusIndicator</td>
@@ -67,7 +116,7 @@
 </MudGrid>
 
 @code {
-    [Inject] 
+    [Inject]
     ISnackbar Snackbar { get; set; }
     bool success;
     string[] errors = { };
@@ -79,8 +128,23 @@
         {
             Artist = new Models.DataToken(),
             ReleaseData = new Models.DataToken(),
+            Media = new List<ReleaseMedia>
+            {
+                new ReleaseMedia 
+                { 
+                    Tracks = new List<Track>
+                    {
+                        new Track
+                        {
+                            TrackArtist = new Artist()
+                            {
+                                ArtistData = new Models.DataToken()
+                            }
+                        }
+                    }
+                }
+            }
         };
-
 
     //    OrderDetailsModelFluentValidator orderDetailsValidator = new OrderDetailsModelFluentValidator();
 
@@ -148,21 +212,21 @@
          };
     }
 
-    [Parameter] 
-    public string ReleaseDirectory { get; set; }
+    [Parameter]
+    public string? ReleaseDirectory { get; set; }
 
-    public async Task DoSave()
+    public Task DoSave()
     {
-
+        throw new NotImplementedException();
     }
 
 
     protected override async Task OnInitializedAsync()
     {
         ReleaseDirectory = System.Net.WebUtility.UrlDecode(ReleaseDirectory);
-        var directoryProcessor = new DirectoryProcessor();
-        _release = await directoryProcessor.ProcessAsync(DateTime.UtcNow, ReleaseDirectory, Directory.GetFiles(ReleaseDirectory));
-        _release.ReleaseDateDateTime = DateTime.Parse(_release.ReleaseDate);
+        DirectoryProcessor directoryProcessor = new DirectoryProcessor();
+        _release = await directoryProcessor.ProcessAsync(DateTime.UtcNow, ReleaseDirectory, Directory.GetFiles(ReleaseDirectory ?? string.Empty));
+        _release.ReleaseDateDateTime = DateTime.Parse(_release.ReleaseDate ?? DateTime.MinValue.ToString());
     }
 
 }

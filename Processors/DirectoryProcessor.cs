@@ -1,4 +1,5 @@
 ﻿using Microsoft.VisualBasic;
+using System.ComponentModel.Design.Serialization;
 using System.Net.NetworkInformation;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -25,14 +26,23 @@ namespace TED.Processors
         {
         }
 
-        public async Task<Release?> ProcessAsync(DateTime now, string dir, string[] filesInDirectory)
+        public async Task<Release?> ProcessAsync(DateTime now, string? dir, string[] filesInDirectory)
         {
             var allfileAtlsFound = new List<ATL.Track>();
             string? directorySFVFile = null;
             string? directoryM3UFile = null;
             var release = new Release();
             release.Directory = dir;
-
+            if(string.IsNullOrEmpty(dir))
+            {
+                release.ProcessingMessages.Add(ProcessMessage.MakeBadMessage("Invalid dir"));
+                return release;
+            }
+            if(!filesInDirectory.Any())
+            {
+                release.ProcessingMessages.Add(ProcessMessage.MakeBadMessage("No files found in dir"));
+                return release;
+            }
             try
             {
                 foreach (var file in filesInDirectory)

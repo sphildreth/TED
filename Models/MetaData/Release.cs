@@ -82,7 +82,7 @@ namespace TED.Models.MetaData
 
         public int? TrackCount { get; set; }
 
-        public Statuses? Status { get; set; }
+        public Statuses Status { get; set; } = Statuses.Incomplete;
 
         [JsonIgnore]
         public List<ProcessMessage> ProcessingMessages { get; set; } = new List<ProcessMessage>();
