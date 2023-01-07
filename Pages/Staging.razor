@@ -1,5 +1,6 @@
 @using TED.Models.MetaData;
 @using System.Text.Json
+@using Mapster;
 @using Microsoft.Extensions.Configuration
 @using TED.Processors;
 @using TED.Utility;
@@ -12,9 +13,9 @@
 
 <PageTitle>Staging</PageTitle>
 
-<MudToolBar>
+<MudToolBar DisableGutters=true>
     <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.ScreenSearchDesktop" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>
-    <MudButton Class="mx-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
+    <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="mx-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
     <MudSpacer />
     @if (_releases.Any(x => x.Status != Enums.Statuses.Ok))
     {
@@ -31,7 +32,8 @@
     <MudBadge Content="@_releases.Sum(x => x.TrackCount)" Overlap="true" Class="mx-3 my-4">
         <MudIcon Icon="@Icons.Material.Filled.AudioFile" Color="Color.Default" />
     </MudBadge>
-    <MudProgressCircular Class="@(_scanning ? "visible" : "invisible")" Color="Color.Info" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
+    <MudProgressCircular Class="@(_scanning ? "visible" : "invisible" + " mb-3 ml-3" )" Color="Color.Info" Size="Size.Small" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
+    <MudProgressCircular Class="@(_movingReleasesProgress > 0 ? "visible" : "invisible" + " mb-3 ml-3" )" Color="Color.Info" Size="Size.Small" Max="@_releases.Count(x => x.Selected)" Value="@_movingReleasesProgress" />
 </MudToolBar>
 
 
@@ -57,6 +59,9 @@
                         <MudIconButton OnClick="@((e) => OpenReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" />
                         <MudIconButton OnClick="@((e) => DeleteReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
                         <MudIconButton OnClick="@((e) => EditRelease(release))" Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
+                        <MudToggleIconButton Disabled="@(!release.IsValid)" @bind-Toggled="@release.Selected"
+                                     Icon="@Icons.Material.Filled.CheckBoxOutlineBlank" Color="@Color.Default"
+                                     ToggledIcon="@Icons.Material.Filled.CheckBox" ToggledColor="@Color.Info" />
                     </MudButtonGroup>
                 </MudCardActions>
 
@@ -95,10 +100,18 @@
 
 
 @code {
+
+    public sealed class StagingRelease : Release
+    {
+        public bool Selected { get; set; }
+    }
+
     bool _scanning = false;
-    List<Release> _releases = new List<Release>();
+    List<StagingRelease> _releases = new List<StagingRelease>();
     int _directorysFound = 0;
     int _processingDirectoryProgress = 0;
+
+    int _movingReleasesProgress = 0;
 
     public Staging()
     {
@@ -125,14 +138,22 @@
         }
     }
 
-    void EditRelease(Release release)
+    void EditRelease(StagingRelease release)
     {
         UriHelper.NavigateTo($"/editrelease/{ System.Net.WebUtility.UrlEncode(release.Directory) }");
     }
 
-    void MoveCheckedToInbound()
+    async Task MoveCheckedToInbound()
     {
-        throw new NotImplementedException();
+        var inboundDirectory = @Configuration["TED:InboundDirectory"];
+        var selectedReleases = _releases.Where(x => x.Selected);
+        _movingReleasesProgress = 0;
+        Parallel.ForEach(selectedReleases, selectedRelease =>
+        {
+            DirectoryProcessor.MoveFolder(selectedRelease.Directory, Path.Combine(inboundDirectory, new DirectoryInfo(selectedRelease.Directory).Name));
+            _movingReleasesProgress++;
+        });
+        await DoScan();
     }
 
     async Task DoScan()
@@ -142,19 +163,20 @@
             _processingDirectoryProgress = 0;
             _scanning = true;
             var now = DateTime.UtcNow;
-            _releases = new List<Release>();
-            var folderToScan = @Configuration["TED:StagingFolder"];
+            _releases = new List<StagingRelease>();
+            var directoryToScan = @Configuration["TED:StagingDirectory"];
             var directoryProcessor = new DirectoryProcessor();
-            var directorysToProcess = Directory.EnumerateDirectories(folderToScan);
+            var directorysToProcess = Directory.EnumerateDirectories(directoryToScan);
             _directorysFound = directorysToProcess.Count();
             foreach (var dir in directorysToProcess)
             {
                 var filesInDirectory = Directory.GetFiles(dir);
                 if (filesInDirectory.Any())
                 {
-                    var releaseForDirectory = await directoryProcessor.ProcessAsync(now, dir, filesInDirectory);
+                    var releaseForDirectory = (await directoryProcessor.ProcessAsync(now, dir, filesInDirectory)).Adapt<StagingRelease>();
                     if (releaseForDirectory != null)
                     {
+                        releaseForDirectory.Selected = releaseForDirectory.IsValid;
                         _releases.Add(releaseForDirectory);
                     }
                 }
@@ -163,9 +185,10 @@
                     var filesInSubDirectory = Directory.GetFiles(subDir);
                     if (filesInSubDirectory.Any())
                     {
-                        var releaseForDirectory = await directoryProcessor.ProcessAsync(now, subDir, filesInSubDirectory);
+                        var releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, filesInSubDirectory)).Adapt<StagingRelease>();
                         if (releaseForDirectory != null)
                         {
+                            releaseForDirectory.Selected = releaseForDirectory.IsValid;
                             _releases.Add(releaseForDirectory);
                         }
                     }

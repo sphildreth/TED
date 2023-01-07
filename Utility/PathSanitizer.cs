@@ -21,8 +21,8 @@ namespace TED.Utility
             c.AddRange(Path.GetInvalidFileNameChars());
 
             // Some Roadie instances run in Linux to Windows SMB clients via Samba this helps with Windows clients and invalid characters in Windows
-            var badWindowsFileAndFoldercharacters = new List<char> { '\\', '"', '/', ':', '*', '$', '?', '\'', '<', '>', '|', '*' };
-            foreach (var badWindowsFilecharacter in badWindowsFileAndFoldercharacters)
+            var badWindowsFileAndDirectoryCharacters = new List<char> { '\\', '"', '/', ':', '*', '$', '?', '\'', '<', '>', '|', '*' };
+            foreach (var badWindowsFilecharacter in badWindowsFileAndDirectoryCharacters)
             {
                 if (!c.Contains(badWindowsFilecharacter))
                 {
@@ -33,7 +33,7 @@ namespace TED.Utility
 
             var f = new List<char>();
             f.AddRange(Path.GetInvalidPathChars());
-            foreach (var badWindowsFilecharacter in badWindowsFileAndFoldercharacters)
+            foreach (var badWindowsFilecharacter in badWindowsFileAndDirectoryCharacters)
             {
                 if (!f.Contains(badWindowsFilecharacter))
                 {

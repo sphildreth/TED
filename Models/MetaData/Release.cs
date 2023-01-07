@@ -5,7 +5,7 @@ using TED.Utility;
 
 namespace TED.Models.MetaData
 {
-    public sealed class Release : MetaDataBase
+    public class Release : MetaDataBase
     {
         public Release()
             :this(null, null)
