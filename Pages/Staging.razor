@@ -8,12 +8,13 @@
 @inject IConfiguration Configuration
 @inject NavigationManager UriHelper
 
-@page "/inbound"
+@page "/staging"
 
-<PageTitle>Inbound</PageTitle>
+<PageTitle>Staging</PageTitle>
 
 <MudToolBar>
     <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.ScreenSearchDesktop" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>
+    <MudButton Class="mx-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
     <MudSpacer />
     @if (_releases.Any(x => x.Status != Enums.Statuses.Ok))
     {
@@ -99,7 +100,7 @@
     int _directorysFound = 0;
     int _processingDirectoryProgress = 0;
 
-    public Inbound()
+    public Staging()
     {
     }
 
@@ -129,6 +130,11 @@
         UriHelper.NavigateTo($"/editrelease/{ System.Net.WebUtility.UrlEncode(release.Directory) }");
     }
 
+    void MoveCheckedToInbound()
+    {
+        throw new NotImplementedException();
+    }
+
     async Task DoScan()
     {
         if (!_scanning)
@@ -137,7 +143,7 @@
             _scanning = true;
             var now = DateTime.UtcNow;
             _releases = new List<Release>();
-            var folderToScan = @Configuration["TED:InboundFolder"];
+            var folderToScan = @Configuration["TED:StagingFolder"];
             var directoryProcessor = new DirectoryProcessor();
             var directorysToProcess = Directory.EnumerateDirectories(folderToScan);
             _directorysFound = directorysToProcess.Count();

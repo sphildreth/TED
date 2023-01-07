@@ -54,7 +54,7 @@
                         {
                             @foreach (var track in media.Tracks.OrderBy(x => x.TrackNumber))
                             {
-                                <tr>
+                                    <tr Class="@($"track-{(track.IsValid ? "valid" : "invalid")}")">
                                     <td>
                                             <MudNumericField T="short?" @bind-Value="@media.MediaNumber"
                                                   For="@(() => @media.MediaNumber)"

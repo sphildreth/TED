@@ -21,7 +21,8 @@ namespace TED.Models.MetaData
                        Duration > 0 &&
                        !string.IsNullOrEmpty(Title) &&
                        !string.IsNullOrEmpty(FileName) &&
-                       FileSize > 0;
+                       FileSize > 0 &&
+                       (Status != Statuses.Missing && Status != Statuses.NeedsAttention);
 
         public string? FileName { get; set; }
 
