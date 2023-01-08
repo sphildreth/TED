@@ -46,6 +46,11 @@ namespace TED.Processors
             }
             try
             {
+                foreach(var subDir in Directory.GetDirectories(dir, "*.*", SearchOption.AllDirectories))
+                {
+                    ProcessSubDirectory(dir, new DirectoryInfo(subDir));
+                }
+
                 foreach (var file in filesInDirectory)
                 {
                     var fileAtl = new ATL.Track(file);
@@ -286,13 +291,31 @@ namespace TED.Processors
                         return releaseData;
                     }
                 }
-
+                else
+                {
+                    release.ProcessingMessages.Add(ProcessMessage.MakeBadMessage("No Media files found in dir"));
+                    release.Status = Statuses.NoMediaFiles;
+                    return release;
+                }
             }
             catch (Exception ex)
             {
                 release.ProcessingMessages.Add(new ProcessMessage(ex));
             }
             return release;
+        }
+
+        private void ProcessSubDirectory(string releaseFolder, DirectoryInfo subDirectory)
+        {
+            var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
+            coverImages.AddRange((ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.ReleaseSecondary) ?? Enumerable.Empty<FileInfo>()));
+            if (coverImages?.Any() ?? false)
+            {
+                Parallel.ForEach(coverImages, coverImage =>
+                {
+                    File.Move(coverImage.FullName, Path.Combine(releaseFolder, coverImage.Name), true);
+                });
+            }
         }
 
         private static async Task<(Image?, int, int)> FirstArtistImageInDirectory(string dir, string[] filesInDirectory)
@@ -475,17 +498,42 @@ namespace TED.Processors
 
         public static bool IsDirectoryEmpty(string path) => !Directory.EnumerateFileSystemEntries(path).Any();
 
-        public static void MoveFolder(string sourceFolder, string destFolder)
+        public static void DeleteDirectory(string target_dir)
         {
-            if (!Directory.Exists(destFolder))
+            try
             {
-                Directory.CreateDirectory(destFolder);
+                string[] files = Directory.GetFiles(target_dir);
+                string[] dirs = Directory.GetDirectories(target_dir);
+                foreach (string file in files)
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                    File.Delete(file);
+                }
+                foreach (string dir in dirs)
+                {
+                    DeleteDirectory(dir);
+                }
+                Directory.Delete(target_dir, false);
+
             }
-            string[] files = Directory.GetFiles(sourceFolder);
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error Deleting [{ target_dir }] [{ ex.Message }]");
+            }
+        }
+
+
+        public static void MoveFolder(string sourceDirectory, string destinationDirectory)
+        {
+            if (!Directory.Exists(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+            string[] files = Directory.GetFiles(sourceDirectory);
             foreach (string file in files)
             {
                 string name = Path.GetFileName(file);
-                string dest = Path.Combine(destFolder, name);
+                string dest = Path.Combine(destinationDirectory, name);
                 if(string.Equals(name, "ted.data.json", StringComparison.OrdinalIgnoreCase))
                 {
                     File.Delete(file);
@@ -495,16 +543,16 @@ namespace TED.Processors
                     File.Move(file, dest, true);
                 }
             }
-            string[] folders = Directory.GetDirectories(sourceFolder);
+            string[] folders = Directory.GetDirectories(sourceDirectory);
             foreach (string folder in folders)
             {
                 string name = Path.GetFileName(folder);
-                string dest = Path.Combine(destFolder, name);
+                string dest = Path.Combine(destinationDirectory, name);
                 MoveFolder(folder, dest);
             }
-            if(IsDirectoryEmpty(sourceFolder))
+            if(IsDirectoryEmpty(sourceDirectory))
             {
-                Directory.Delete(sourceFolder);
+                Directory.Delete(sourceDirectory);
             }
         }
     }

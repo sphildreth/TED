@@ -13,6 +13,7 @@ namespace TED.Enums
         Reviewed = 8,
         Migrated = 9,
         NeedsAttention = 10,
+        NoMediaFiles = 11,
         Deleted = 99
     }
 }

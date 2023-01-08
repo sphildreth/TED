@@ -176,8 +176,11 @@
                     var releaseForDirectory = (await directoryProcessor.ProcessAsync(now, dir, filesInDirectory)).Adapt<StagingRelease>();
                     if (releaseForDirectory != null)
                     {
-                        releaseForDirectory.Selected = releaseForDirectory.IsValid;
-                        _releases.Add(releaseForDirectory);
+                        if (releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
+                        {
+                            releaseForDirectory.Selected = releaseForDirectory.IsValid;
+                            _releases.Add(releaseForDirectory);
+                        }
                     }
                 }
                 foreach (var subDir in Directory.GetDirectories(dir, "*", SearchOption.AllDirectories))

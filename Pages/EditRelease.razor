@@ -95,7 +95,7 @@
                 </MudCardContent>
             </MudForm>
             <MudCardActions>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="@(async () => await Submit())">Save</MudButton>
+                <MudButton Disabled="@_submitted" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="@(async () => await Submit())">Save</MudButton>
             </MudCardActions>
         </MudCard>
     </MudItem>
@@ -130,6 +130,7 @@
     MudForm form;
     ReleaseFluentValidator releaseValidator = new ReleaseFluentValidator();
     string[] messageHeadings = { "Type", "Details" };
+    bool _submitted = false;
 
     Release _release = new Release
         {
@@ -161,12 +162,14 @@
 
         if (form.IsValid)
         {
+            _submitted = true;
             var saveProcessor = new ReleaseSaveProcessor();
             var result = await saveProcessor.ProcessAsync(DateTime.UtcNow, _release);
             if(!result.Item1)
             {
                 errors = result.Item2.ToArray();
                 Snackbar.Add("Error saving", MudBlazor.Severity.Error);
+                _submitted = false;
             }
             else
             {
