@@ -1,6 +1,7 @@
 ﻿using Microsoft.VisualBasic;
 using System.ComponentModel.Design.Serialization;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using TED.Enums;
@@ -16,7 +17,7 @@ namespace TED.Processors
 
         private static readonly Regex _hasFeatureFragmentsRegex = new(@"\((ft.|feat.|featuring|feature)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\\s*(-\\s)*((CD[_\-#\s]*[0-9]*)))|((\\(|\\[)+([0-9]|,|self|bonus|re(leas|master|(e|d)*)*|th|anniversary|cd|disc|deluxe|dig(ipack)*|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|\\s)+(]|\\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\\s*(-\\s)*((CD[_\-#\s]*[0-9]*)))|((\\(|\\[)+([0-9]|,|self|bonus|re(leas|master|(e|d)*)*|th|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|\\s)+(]|\\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedTrackTitleTextRegex = new(@"(\s{2,})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -58,7 +59,11 @@ namespace TED.Processors
                     }
                     if (string.Equals(Path.GetExtension(file), ".m3u", StringComparison.OrdinalIgnoreCase))
                     {
-                        directoryM3UFile = file;
+                        var isFirstM3uFileInDirectory = string.IsNullOrEmpty(directoryM3UFile);
+                        if (isFirstM3uFileInDirectory)
+                        {
+                            directoryM3UFile = file;
+                        }
                     }
                 }
                 if (allfileAtlsFound.Any(x => x.AudioFormat.ID > -1))
@@ -79,12 +84,12 @@ namespace TED.Processors
                             Artist = new Models.DataToken
                             {
                                 Value = SafeParser.ToToken(firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist),
-                                Text = firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist
+                                Text = (firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist).CleanString()
                             },
                             ReleaseData = new Models.DataToken
                             {
                                 Value = SafeParser.ToToken(groupedByRelease.Key),
-                                Text = groupedByRelease.Key
+                                Text = groupedByRelease.Key.CleanString()
                             },
                             Genre = firstAtl.Genre.Nullify() == null ? null : new Models.DataToken
                             {
@@ -164,7 +169,7 @@ namespace TED.Processors
                                     FileSize = SafeParser.ToNumber<int?>(x.FileInfo().Length),
                                     Id = Guid.NewGuid(),
                                     Status = (x.FileInfo()?.Exists ?? false) ? Statuses.New : Statuses.Missing,
-                                    Title = x.Title,
+                                    Title = x.Title.CleanString(),
                                     TrackArtist = string.IsNullOrWhiteSpace(x.Artist) || string.Equals(releaseData.Artist.Value, x.Artist, StringComparison.OrdinalIgnoreCase) ? null : new Artist
                                     {
                                         ArtistData = new Models.DataToken
@@ -203,7 +208,7 @@ namespace TED.Processors
                         {
                             foreach (var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
                             {
-                                var trackStatusCheckData = CheckTrackStatus(track.t);
+                                var trackStatusCheckData = CheckTrackStatus(releaseData, track.t);
                                 track.t.Status = trackStatusCheckData.Item1;
                                 if (track.t.TrackNumber != track.i + 1)
                                 {
@@ -341,9 +346,9 @@ namespace TED.Processors
             return (release?.Status ?? Statuses.NeedsAttention, null);
         }
 
-        private static (Statuses, IEnumerable<ProcessMessage>?) CheckTrackStatus(Track track)
+        private static (Statuses, IEnumerable<ProcessMessage>?) CheckTrackStatus(Release release, Track track)
         {
-            if (TrackArtistHasReleaseArtist(track) || TrackHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(track?.Title ?? string.Empty, track?.Title ?? string.Empty, track.TrackNumber))
+            if (TrackArtistHasReleaseArtist(release, track) || TrackHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty, track?.Title ?? string.Empty, track.TrackNumber))
             {
                 return (Statuses.NeedsAttention, new List<ProcessMessage> { ProcessMessage.MakeBadMessage($"Track [{ track }] Title has unwanted text.") });
             }
@@ -353,7 +358,7 @@ namespace TED.Processors
         /// <summary>
         /// When the TrackArtist name contains the Release Artist name (e.g. Release Artist "Bob Dylan" and the Track Artist is "Bob Dylan/Tracey Morgan")
         /// </summary>
-        private static bool TrackArtistHasReleaseArtist(Track track)
+        private static bool TrackArtistHasReleaseArtist(Release release, Track track)
         {
             
             return false;
@@ -368,26 +373,34 @@ namespace TED.Processors
             return _hasFeatureFragmentsRegex.IsMatch(input);
         }
 
-        private static bool ReleaseHasUnwantedText(string releaseTitle)
+        public static bool ReleaseHasUnwantedText(string releaseTitle)
         {
             if (string.IsNullOrWhiteSpace(releaseTitle))
             {
-                return false;
+                return true;
             }
-            return _unwantedReleaseTitleTextRegex.IsMatch(releaseTitle);
+            if (_unwantedReleaseTitleTextRegex.IsMatch(releaseTitle))
+            {
+                return true;
+            }
+            if (releaseTitle.ContainsUnicodeCharacter())
+            {
+                return true;
+            }
+            return false;
         }
 
         public static bool TrackHasUnwantedText(string releaseTitle, string trackTitle, int? trackNumber)
         {
             if (string.IsNullOrWhiteSpace(trackTitle))
             {
-                return false;
+                return true;
             }
             if (_unwantedTrackTitleTextRegex.IsMatch(trackTitle))
             {
                 return true;
             }
-            if(trackTitle.Contains(releaseTitle, StringComparison.OrdinalIgnoreCase))
+            if(trackTitle.ContainsUnicodeCharacter())
             {
                 return true;
             }
@@ -397,7 +410,7 @@ namespace TED.Processors
                 {
                     return true;
                 }
-                return Regex.IsMatch(trackTitle, $"0*{trackNumber}\\s\\b");
+                return Regex.IsMatch(trackTitle, $"(0*{trackNumber}\\s)");
             }
             return false;
         }
@@ -439,6 +452,10 @@ namespace TED.Processors
         private static bool IsLineForFileForTrack(string lineFromFile)
         {
             if (string.IsNullOrWhiteSpace(lineFromFile))
+            {
+                return false;
+            }
+            if(lineFromFile.StartsWith("#"))
             {
                 return false;
             }
