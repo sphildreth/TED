@@ -17,7 +17,7 @@ namespace TED.Processors
 
         private static readonly Regex _hasFeatureFragmentsRegex = new(@"\((ft.|feat.|featuring|feature)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\\s*(-\\s)*((CD[_\-#\s]*[0-9]*)))|((\\(|\\[)+([0-9]|,|self|bonus|re(leas|master|(e|d)*)*|th|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|\\s)+(]|\\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|((,|self|bonus|re(leas|master|(e|d)*)*|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedTrackTitleTextRegex = new(@"(\s{2,})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -410,7 +410,7 @@ namespace TED.Processors
                 {
                     return true;
                 }
-                return Regex.IsMatch(trackTitle, $"(0*{trackNumber}\\s)");
+                return Regex.IsMatch(trackTitle, $"^({releaseTitle}\\s*.*\\s*)?([0-9]*{trackNumber}\\s)");
             }
             return false;
         }
