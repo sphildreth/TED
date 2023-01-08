@@ -3,6 +3,7 @@
 @using TED.Processors;
 @using System.Text.RegularExpressions
 @using System.ComponentModel.DataAnnotations
+@inject NavigationManager NavigationManager
 
 <PageTitle>Editing Release</PageTitle>
 
@@ -22,6 +23,12 @@
         <MudCard>
             <MudForm Model="@_release" @ref="@form" Validation="@(releaseValidator.ValidateValue)" ValidationDelay="0">
                 <MudCardContent>
+                    <MudSelect @bind-Value="_release.Status" T="Enums.Statuses" Label="Status" AnchorOrigin="Origin.BottomCenter">
+                        @foreach (var e in Enum.GetValues(typeof(Enums.Statuses)).Cast<Enums.Statuses>())
+                        {
+                            <MudSelectItem Value="@(e)" />
+                        }
+                    </MudSelect>
                     <MudTextField @bind-Value="_release.Artist.Text"
                                   For="@(() => _release.Artist.Text)"
                                   Immediate="true"
@@ -154,7 +161,18 @@
 
         if (form.IsValid)
         {
-            Snackbar.Add("Submited!");
+            var saveProcessor = new ReleaseSaveProcessor();
+            var result = await saveProcessor.ProcessAsync(DateTime.UtcNow, _release);
+            if(!result.Item1)
+            {
+                errors = result.Item2.ToArray();
+                Snackbar.Add("Error saving", MudBlazor.Severity.Error);
+            }
+            else
+            {
+                Snackbar.Add("Saved!");
+                NavigationManager.NavigateTo("/staging");
+            }
         }
     }
 
@@ -225,8 +243,9 @@
     {
         ReleaseDirectory = System.Net.WebUtility.UrlDecode(ReleaseDirectory);
         DirectoryProcessor directoryProcessor = new DirectoryProcessor();
-        _release = await directoryProcessor.ProcessAsync(DateTime.UtcNow, ReleaseDirectory, Directory.GetFiles(ReleaseDirectory ?? string.Empty));
+        _release = await directoryProcessor.ProcessAsync(DateTime.UtcNow, ReleaseDirectory, Directory.GetFiles(ReleaseDirectory ?? string.Empty)) ?? _release;
         _release.ReleaseDateDateTime = DateTime.Parse(_release.ReleaseDate ?? DateTime.MinValue.ToString());
+        _release.Status = Enums.Statuses.Reviewed;
     }
 
 }

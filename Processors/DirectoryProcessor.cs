@@ -17,7 +17,7 @@ namespace TED.Processors
 
         private static readonly Regex _hasFeatureFragmentsRegex = new(@"\((ft.|feat.|featuring|feature)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|((,|self|bonus|re(leas|master|(e|d)*)*|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|((,|self|bonus|re(leas|master|(e|d)*)*|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedTrackTitleTextRegex = new(@"(\s{2,})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -146,7 +146,7 @@ namespace TED.Processors
                             {
                                 Bytes = Convert.FromBase64String(ImageNotFound)
                             };
-                            releaseData.Status = Statuses.Incomplete;
+                            releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : Statuses.Incomplete;
                             releaseData.ProcessingMessages.Add(new ProcessMessage("CoverImage not found.", false, ProcessMessage.BadCheckMark));
                         }
                         var medias = new List<ReleaseMedia>();
@@ -184,7 +184,7 @@ namespace TED.Processors
                         }
                         releaseData.Media = medias;
                         releaseData.TrackCount = medias.Sum(x => x.TrackCount);
-                        releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Count() == releaseData.Media.Sum(x => x.TrackCount) ? Enums.Statuses.Ok : Enums.Statuses.Incomplete;
+                        releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : releaseData.Media.SelectMany(x => x.Tracks).Count() == releaseData.Media.Sum(x => x.TrackCount) ? Enums.Statuses.Ok : Enums.Statuses.Incomplete;
                         releaseData.Duration = medias.SelectMany(x => x.Tracks).Sum(x => x.Duration);
                         if (releaseData.Status == Enums.Statuses.Ok && directorySFVFile.Nullify() != null)
                         {
@@ -220,13 +220,13 @@ namespace TED.Processors
                                     releaseData.ProcessingMessages.AddRange(trackStatusCheckData.Item2);
                                 }
                             }
-                            if (media.v.MediaNumber != media.i + 1)
+                            if (releaseData.Status != Statuses.Reviewed && media.v.MediaNumber != media.i + 1)
                             {
                                 releaseData.Status = Statuses.NeedsAttention;
                                 releaseData.ProcessingMessages.Add(new ProcessMessage($"Media [{media.v.ToString()}] MediaNumber expected [{media.i + 1}] found [{media.v.MediaNumber}]", false, ProcessMessage.BadCheckMark));
                             }
                         }
-                        releaseData.Status = releaseData.Media.SelectMany(x => x.Tracks).Any(x => x.Status != Statuses.New) ? Statuses.NeedsAttention : releaseData.Status;
+                        releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : releaseData.Media.SelectMany(x => x.Tracks).Any(x => x.Status != Statuses.New) ? Statuses.NeedsAttention : releaseData.Status;
                         if (releaseData.Status == Statuses.Ok)
                         {
                             var releaseStatusCheckData = CheckReleaseStatus(releaseData);
@@ -348,6 +348,10 @@ namespace TED.Processors
 
         private static (Statuses, IEnumerable<ProcessMessage>?) CheckTrackStatus(Release release, Track track)
         {
+            if(release.Status == Statuses.Reviewed)
+            {
+                return (release.Status, null);
+            }
             if (TrackArtistHasReleaseArtist(release, track) || TrackHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty, track?.Title ?? string.Empty, track.TrackNumber))
             {
                 return (Statuses.NeedsAttention, new List<ProcessMessage> { ProcessMessage.MakeBadMessage($"Track [{ track }] Title has unwanted text.") });

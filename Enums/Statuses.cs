@@ -10,7 +10,7 @@ namespace TED.Enums
         Wishlist = 5,
         AdminRemoved = 6,
         Expired = 7,
-        ReadyToMigrate = 8,
+        Reviewed = 8,
         Migrated = 9,
         NeedsAttention = 10,
         Deleted = 99

@@ -59,7 +59,7 @@
                         <MudIconButton OnClick="@((e) => OpenReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" />
                         <MudIconButton OnClick="@((e) => DeleteReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
                         <MudIconButton OnClick="@((e) => EditRelease(release))" Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
-                        <MudToggleIconButton Disabled="@(!release.IsValid)" @bind-Toggled="@release.Selected"
+                        <MudToggleIconButton @bind-Toggled="@release.Selected"
                                      Icon="@Icons.Material.Filled.CheckBoxOutlineBlank" Color="@Color.Default"
                                      ToggledIcon="@Icons.Material.Filled.CheckBox" ToggledColor="@Color.Info" />
                     </MudButtonGroup>
