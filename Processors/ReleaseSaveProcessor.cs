@@ -1,6 +1,4 @@
-﻿using System.ComponentModel.Design.Serialization;
-using System.Text.Json;
-using TED.Models.MetaData;
+﻿using TED.Models.MetaData;
 
 namespace TED.Processors
 {
@@ -17,7 +15,7 @@ namespace TED.Processors
 
             try
             {
-                if(release.ArtistThumbnail != null)
+                if (release.ArtistThumbnail != null)
                 {
                     await File.WriteAllBytesAsync(Path.Combine(releaseDirectory, "artist.jpg"), release.ArtistThumbnail.Bytes);
                 }
@@ -37,6 +35,7 @@ namespace TED.Processors
                         fileAtl.AlbumArtist = releaseArtist;
                         fileAtl.Album = release.ReleaseData?.Text;
                         fileAtl.TrackNumber = trackForFile.TrackNumber;
+                        fileAtl.TrackTotal = release.Media.FirstOrDefault(x => x.TrackById(trackForFile.Id) != null)?.TrackCount;
                         fileAtl.Title = trackForFile.Title;
                         fileAtl.Year = release.ReleaseDateDateTime?.Year ?? throw new Exception("Invalid Release year");
                         var trackArtist = trackForFile.TrackArtist?.ArtistData?.Text;
@@ -57,7 +56,7 @@ namespace TED.Processors
             }
 
             var roadieDataFileName = Path.Combine(releaseDirectory, $"ted.data.json");
-            if(File.Exists(roadieDataFileName))
+            if (File.Exists(roadieDataFileName))
             {
                 File.Delete(roadieDataFileName);
             }

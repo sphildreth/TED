@@ -1,6 +1,7 @@
 using NodaTime;
 using System.Text.Json.Serialization;
 using TED.Enums;
+using TED.Extensions;
 using TED.Utility;
 
 namespace TED.Models.MetaData
@@ -42,6 +43,14 @@ namespace TED.Models.MetaData
                 }
 
                 return new TimeInfo(SafeParser.ToNumber<decimal>(Duration.Value)).ToFullFormattedString();
+            }
+        }
+
+        public string FormattedMediaSize
+        {
+            get
+            {
+                return SafeParser.ToNumber<long>(Media?.SelectMany(x => x.Tracks).Sum(x => x.FileSize) ?? 0).FormatFileSize();
             }
         }
 

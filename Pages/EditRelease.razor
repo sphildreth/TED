@@ -7,6 +7,10 @@
 
 <PageTitle>Editing Release</PageTitle>
 
+<MudToolBar DisableGutters=true>
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.Numbers" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await RenumberTracks())">Renumber Tracks</MudButton>
+</MudToolBar>
+
 <div Class="d-flex flex-wrap">
     <MudText Class="mt-4">Editing Directory: @ReleaseDirectory</MudText>
     <MudSpacer />
@@ -155,6 +159,21 @@
         };
 
     //    OrderDetailsModelFluentValidator orderDetailsValidator = new OrderDetailsModelFluentValidator();
+
+    private async Task RenumberTracks()
+    {
+        var looper = 1;
+        foreach(var media in _release.Media)
+        {
+            looper = 1;
+            foreach (var track in media.Tracks)
+            {
+                track.TrackNumber = looper;
+                looper++;
+            }            
+        }
+        _release.TrackCount = looper;
+    }
 
     private async Task Submit()
     {

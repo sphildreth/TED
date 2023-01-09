@@ -1,8 +1,4 @@
-﻿using Microsoft.VisualBasic;
-using System.ComponentModel.Design.Serialization;
-using System.Net.NetworkInformation;
-using System.Runtime.InteropServices;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 using TED.Enums;
 using TED.Extensions;
@@ -14,7 +10,6 @@ namespace TED.Processors
 {
     public sealed class DirectoryProcessor
     {
-
         private static readonly Regex _hasFeatureFragmentsRegex = new(@"\((ft.|feat.|featuring|feature)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|((,|self|bonus|re(leas|master|(e|d)*)*|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -34,19 +29,19 @@ namespace TED.Processors
             string? directoryM3UFile = null;
             var release = new Release();
             release.Directory = dir;
-            if(string.IsNullOrEmpty(dir))
+            if (string.IsNullOrEmpty(dir))
             {
                 release.ProcessingMessages.Add(ProcessMessage.MakeBadMessage("Invalid dir"));
                 return release;
             }
-            if(!filesInDirectory.Any())
+            if (!filesInDirectory.Any())
             {
                 release.ProcessingMessages.Add(ProcessMessage.MakeBadMessage("No files found in dir"));
                 return release;
             }
             try
             {
-                foreach(var subDir in Directory.GetDirectories(dir, "*.*", SearchOption.AllDirectories))
+                foreach (var subDir in Directory.GetDirectories(dir, "*.*", SearchOption.AllDirectories))
                 {
                     ProcessSubDirectory(dir, new DirectoryInfo(subDir));
                 }
@@ -126,7 +121,7 @@ namespace TED.Processors
                         {
                             var artistThumbnailData = await FirstArtistImageInDirectory(dir, filesInDirectory);
                             releaseData.ArtistThumbnail = artistThumbnailData.Item1;
-                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{ artistThumbnailData.Item2 }] number of Artist images.", artistThumbnailData.Item2 > 0, artistThumbnailData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
+                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{artistThumbnailData.Item2}] number of Artist images.", artistThumbnailData.Item2 > 0, artistThumbnailData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
                         }
                         var firstAtlHasReleaseImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Front ||
                                                                                                      x.PicType == ATL.PictureInfo.PIC_TYPE.Generic);
@@ -218,7 +213,7 @@ namespace TED.Processors
                                 if (track.t.TrackNumber != track.i + 1)
                                 {
                                     track.t.Status = Statuses.NeedsAttention;
-                                    releaseData.ProcessingMessages.Add(new ProcessMessage ($"Track [{ track.t.ToString() }] TrackNumber expected [{ track.i + 1 }] found [{ track.t.TrackNumber }]", false, ProcessMessage.BadCheckMark));
+                                    releaseData.ProcessingMessages.Add(new ProcessMessage($"Track [{track.t.ToString()}] TrackNumber expected [{track.i + 1}] found [{track.t.TrackNumber}]", false, ProcessMessage.BadCheckMark));
                                 }
                                 if (trackStatusCheckData.Item2 != null)
                                 {
@@ -236,7 +231,7 @@ namespace TED.Processors
                         {
                             var releaseStatusCheckData = CheckReleaseStatus(releaseData);
                             releaseData.Status = releaseStatusCheckData.Item1;
-                            if(releaseStatusCheckData.Item2 != null)
+                            if (releaseStatusCheckData.Item2 != null)
                             {
                                 releaseData.ProcessingMessages.AddRange(releaseStatusCheckData.Item2);
                             }
@@ -259,7 +254,7 @@ namespace TED.Processors
                             ));
                         releaseData.ProcessingMessages.Add(new ProcessMessage
                             (
-                                $"Release is { (releaseData.IsValid ? "valid" : "invalid") }",
+                                $"Release is {(releaseData.IsValid ? "valid" : "invalid")}",
                                 releaseData.IsValid,
                                 releaseData.IsValid ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
                             ));
@@ -364,20 +359,20 @@ namespace TED.Processors
         {
             if (ReleaseHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty))
             {
-                return (Statuses.NeedsAttention, new List<ProcessMessage> { ProcessMessage.MakeBadMessage($"Release [{ release }] Title has unwanted text.") });
+                return (Statuses.NeedsAttention, new List<ProcessMessage> { ProcessMessage.MakeBadMessage($"Release [{release}] Title has unwanted text.") });
             }
             return (release?.Status ?? Statuses.NeedsAttention, null);
         }
 
         private static (Statuses, IEnumerable<ProcessMessage>?) CheckTrackStatus(Release release, Track track)
         {
-            if(release.Status == Statuses.Reviewed)
+            if (release.Status == Statuses.Reviewed)
             {
                 return (release.Status, null);
             }
             if (TrackArtistHasReleaseArtist(release, track) || TrackHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty, track?.Title ?? string.Empty, track.TrackNumber))
             {
-                return (Statuses.NeedsAttention, new List<ProcessMessage> { ProcessMessage.MakeBadMessage($"Track [{ track }] Title has unwanted text.") });
+                return (Statuses.NeedsAttention, new List<ProcessMessage> { ProcessMessage.MakeBadMessage($"Track [{track}] Title has unwanted text.") });
             }
             return (track?.Status ?? Statuses.Missing, null);
         }
@@ -387,7 +382,6 @@ namespace TED.Processors
         /// </summary>
         private static bool TrackArtistHasReleaseArtist(Release release, Track track)
         {
-            
             return false;
         }
 
@@ -427,13 +421,13 @@ namespace TED.Processors
             {
                 return true;
             }
-            if(trackTitle.ContainsUnicodeCharacter())
+            if (trackTitle.ContainsUnicodeCharacter())
             {
                 return true;
             }
-            if(trackTitle.Any(char.IsDigit))
+            if (trackTitle.Any(char.IsDigit))
             {
-                if(string.Equals(trackTitle.Trim(), (trackNumber ?? 0).ToString(), StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(trackTitle.Trim(), (trackNumber ?? 0).ToString(), StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }
@@ -482,7 +476,7 @@ namespace TED.Processors
             {
                 return false;
             }
-            if(lineFromFile.StartsWith("#"))
+            if (lineFromFile.StartsWith("#"))
             {
                 return false;
             }
@@ -514,14 +508,12 @@ namespace TED.Processors
                     DeleteDirectory(dir);
                 }
                 Directory.Delete(target_dir, false);
-
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error Deleting [{ target_dir }] [{ ex.Message }]");
+                Console.WriteLine($"Error Deleting [{target_dir}] [{ex.Message}]");
             }
         }
-
 
         public static void MoveFolder(string sourceDirectory, string destinationDirectory)
         {
@@ -534,7 +526,7 @@ namespace TED.Processors
             {
                 string name = Path.GetFileName(file);
                 string dest = Path.Combine(destinationDirectory, name);
-                if(string.Equals(name, "ted.data.json", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(name, "ted.data.json", StringComparison.OrdinalIgnoreCase))
                 {
                     File.Delete(file);
                 }
@@ -550,7 +542,7 @@ namespace TED.Processors
                 string dest = Path.Combine(destinationDirectory, name);
                 MoveFolder(folder, dest);
             }
-            if(IsDirectoryEmpty(sourceDirectory))
+            if (IsDirectoryEmpty(sourceDirectory))
             {
                 Directory.Delete(sourceDirectory);
             }
