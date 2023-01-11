@@ -32,8 +32,8 @@
     <MudBadge Content="@_releases.Sum(x => x.TrackCount)" Overlap="true" Class="mx-3 my-4">
         <MudIcon Icon="@Icons.Material.Filled.AudioFile" Color="Color.Default" />
     </MudBadge>
-    <MudProgressCircular Class="@(_scanning ? "visible" : "invisible" + " mb-3 ml-3" )" Color="Color.Info" Size="Size.Small" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
-    <MudProgressCircular Class="@(_movingReleasesProgress > 0 ? "visible" : "invisible" + " mb-3 ml-3" )" Color="Color.Info" Size="Size.Small" Max="@_releases.Count(x => x.Selected)" Value="@_movingReleasesProgress" />
+    <MudProgressCircular Class="@(_scanning ? "visible" : "invisible" + " mb-3 mX-6" )" Color="Color.Info" Size="Size.Small" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
+    <MudProgressCircular Class="@(_movingReleasesProgress > 0 ? "visible" : "invisible" + " mb-3 mX-6" )" Color="Color.Info" Size="Size.Small" Max="@_releases.Count(x => x.Selected)" Value="@_movingReleasesProgress" />
 </MudToolBar>
 
 
@@ -199,6 +199,7 @@
                     }
                 }
                 _processingDirectoryProgress++;
+                StateHasChanged();
             }
             _scanning = false;
         }

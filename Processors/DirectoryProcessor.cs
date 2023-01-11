@@ -12,7 +12,7 @@ namespace TED.Processors
     {
         private static readonly Regex _hasFeatureFragmentsRegex = new(@"\((ft.|feat.|featuring|feature)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|((,|self|bonus|re(leas|master|(e|d)*)*|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|((,|self|bonus|release|remaster|remastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedTrackTitleTextRegex = new(@"(\s{2,})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -282,7 +282,16 @@ namespace TED.Processors
                                 releaseData.Year > 0,
                                 releaseData.Year > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
                             ));
-
+                        if (releaseData.ArtistThumbnail != null)
+                        {
+                            await File.WriteAllBytesAsync(Path.Combine(releaseData.Directory, "artist.jpg"), releaseData.ArtistThumbnail.Bytes);
+                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Updated Artist Thumbnail image file."));
+                        }
+                        if (releaseData.CoverImage != null)
+                        {
+                            await File.WriteAllBytesAsync(Path.Combine(releaseData.Directory, "cover.jpg"), releaseData.CoverImage.Bytes);
+                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Updated Release Cover image file."));
+                        }
                         return releaseData;
                     }
                 }
