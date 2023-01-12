@@ -204,6 +204,15 @@ namespace TED.Processors
                             }
                             releaseData.ProcessingMessages.Add(new ProcessMessage("Checked TrackCount with M3U", doesTrackCountMatchM3UCount, doesTrackCountMatchM3UCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
                         }
+                        if(releaseData.Status == Statuses.Ok)
+                        {
+                            var doAllTracksHaveSameAlbumArtist = AllTracksForHaveSameArtist(releaseData.Artist.Text, tagsFilesFound);
+                            if (!doAllTracksHaveSameAlbumArtist)
+                            {
+                                releaseData.Status = Enums.Statuses.NeedsAttention;
+                                releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Tracks have different Album Artists [{tagsFilesFound.GroupBy(x => x.Artist).Select(x => x.Key).ToCsv() }]"));
+                            }
+                        }
                         foreach (var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v, i) => new { i, v }))
                         {
                             foreach (var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
@@ -320,6 +329,16 @@ namespace TED.Processors
                     File.Move(coverImage.FullName, Path.Combine(releaseFolder, coverImage.Name), true);
                 });
             }
+        }
+
+        private static bool AllTracksForHaveSameArtist(string albumArtist, IEnumerable<ATL.Track> atlTracksForRelease)
+        {
+            if (!atlTracksForRelease.Any())
+            {
+                return false;
+            }
+            var tracksGroupedByArtist = atlTracksForRelease.GroupBy(x => x.AlbumArtist);
+            return string.Equals(tracksGroupedByArtist.First().Key, albumArtist) && tracksGroupedByArtist.Count() == 1;
         }
 
         private static async Task<(Image?, int, int)> FirstArtistImageInDirectory(string dir, string[] filesInDirectory)

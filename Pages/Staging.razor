@@ -14,6 +14,9 @@
 <PageTitle>Staging</PageTitle>
 
 <MudToolBar DisableGutters=true>
+    <MudPaper Height="38px" Class="d-flex justify-space-around mr-2" Elevation="0">
+        <MudProgressLinear Vertical="true" Striped="true" Color="Color.Primary" Size="Size.Small" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
+    </MudPaper>
     <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.ScreenSearchDesktop" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="mx-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
     <MudSpacer />
@@ -32,8 +35,6 @@
     <MudBadge Content="@_releases.Sum(x => x.TrackCount)" Overlap="true" Class="mx-3 my-4">
         <MudIcon Icon="@Icons.Material.Filled.AudioFile" Color="Color.Default" />
     </MudBadge>
-    <MudProgressCircular Class="@(_scanning ? "visible" : "invisible" + " mb-3 mX-6" )" Color="Color.Info" Size="Size.Small" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
-    <MudProgressCircular Class="@(_movingReleasesProgress > 0 ? "visible" : "invisible" + " mb-3 mX-6" )" Color="Color.Info" Size="Size.Small" Max="@_releases.Count(x => x.Selected)" Value="@_movingReleasesProgress" />
 </MudToolBar>
 
 
@@ -109,12 +110,10 @@
     }
 
     bool _scanning = false;
+    bool _movingFolders = false;
     List<StagingRelease> _releases = new List<StagingRelease>();
     int _directorysFound = 0;
     int _processingDirectoryProgress = 0;
-
-    int _movingReleasesProgress = 0;
-
     public Staging()
     {
     }
@@ -133,7 +132,7 @@
         var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
         var dialog = await DialogService.ShowAsync<Dialog>("Delete Directory", parameters);
         var result = await dialog.Result;
-        if (!result.Cancelled)
+        if (!result.Canceled)
         {
             Directory.Delete(dir, true);
             _releases.Remove(_releases.First(x => x.Directory == dir));
@@ -147,20 +146,26 @@
 
     async Task MoveCheckedToInbound()
     {
+        _movingFolders = true;
         var inboundDirectory = @Configuration["TED:InboundDirectory"];
         var selectedReleases = _releases.Where(x => x.Selected);
-        _movingReleasesProgress = 0;
+        _directorysFound = selectedReleases.Count();
+        _processingDirectoryProgress = 0;
         Parallel.ForEach(selectedReleases, selectedRelease =>
         {
             DirectoryProcessor.MoveFolder(selectedRelease.Directory, Path.Combine(inboundDirectory, new DirectoryInfo(selectedRelease.Directory).Name));
-            _movingReleasesProgress++;
+            _processingDirectoryProgress++;
+            InvokeAsync(StateHasChanged);
         });
+        _processingDirectoryProgress = 0;
+        StateHasChanged();
+        _movingFolders = false;
         await DoScan();
     }
 
     async Task DoScan()
     {
-        if (!_scanning)
+        if (!_scanning && !_movingFolders)
         {
             _processingDirectoryProgress = 0;
             _scanning = true;
@@ -202,6 +207,8 @@
                 StateHasChanged();
             }
             _scanning = false;
+            _processingDirectoryProgress = 0;
+            StateHasChanged();
         }
     }
 }
