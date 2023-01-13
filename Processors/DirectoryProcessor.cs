@@ -1,4 +1,5 @@
-﻿using System.Security;
+﻿using Mapster;
+using System.Security;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using TED.Enums;
@@ -175,12 +176,12 @@ namespace TED.Processors
                                     Id = Guid.NewGuid(),
                                     Status = (x.FileInfo()?.Exists ?? false) ? Statuses.New : Statuses.Missing,
                                     Title = x.Title.CleanString(),
-                                    TrackArtist = StringExt.DoStringsMatch(releaseData.Artist.Text, x.Artist) ? null : new Artist
+                                    TrackArtist = new Artist
                                     {
                                         ArtistData = new Models.DataToken
                                         {
-                                            Value = SafeParser.ToToken(x.Artist),
-                                            Text = x.Artist
+                                            Value = SafeParser.ToToken(StringExt.DoStringsMatch(releaseData.Artist.Text, x.Artist) ? string.Empty : x.Artist),
+                                            Text = StringExt.DoStringsMatch(releaseData.Artist.Text, x.Artist) ? string.Empty : x.Artist
                                         }
                                     },
                                     TrackNumber = x.TrackNumber
@@ -218,6 +219,14 @@ namespace TED.Processors
                             {
                                 releaseData.Status = Enums.Statuses.NeedsAttention;
                                 releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Tracks have different Album Artists [{tagsFilesFound.GroupBy(x => x.Artist).Select(x => x.Key).ToCsv() }]"));
+                            }
+                        }
+                        if (releaseData.Status == Statuses.Ok)
+                        {
+                            if (StringHasFeaturingFragments(releaseData.Artist.Text))
+                            {
+                                releaseData.Status = Enums.Statuses.NeedsAttention;
+                                releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Release Artist has featuring fragments"));
                             }
                         }
                         foreach (var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v, i) => new { i, v }))
@@ -461,7 +470,7 @@ namespace TED.Processors
             return false;
         }
 
-        public static bool StringHasFeaturingFragments(string input)
+        public static bool StringHasFeaturingFragments(string? input)
         {
             if (string.IsNullOrWhiteSpace(input))
             {
