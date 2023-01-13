@@ -17,7 +17,7 @@
     <MudPaper Height="38px" Class="d-flex justify-space-around mr-2" Elevation="0">
         <MudProgressLinear Vertical="true" Striped="true" Color="Color.Primary" Size="Size.Small" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
     </MudPaper>
-    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.ScreenSearchDesktop" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.ScreenSearchDesktop" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Warning" Size="Size.Medium" OnClick="@((e) => DeleteChecked())">Delete</MudButton>
     <MudSpacer />
@@ -79,7 +79,7 @@
                             </MudText>
                         </MudTooltip>
                         <MudText Class="truncate-text" Typo="Typo.subtitle2"><MudIcon Title="Duration" Size="Size.Small" Class="pt-2" Icon="@Icons.Material.Filled.AccessTime" Color="Color.Info" /> @release.DurationTime</MudText>
-                        <MudText Class="truncate-text" Typo="Typo.subtitle2"><MudIcon Title="Medai Size" Size="Size.Small" Class="pt-2" Icon="@Icons.Material.Filled.AudioFile" Color="Color.Info" /> @release.FormattedMediaSize</MudText>
+                        <MudText Class="truncate-text" Typo="Typo.subtitle2"><MudIcon Title="Media Size" Size="Size.Small" Class="pt-2" Icon="@Icons.Material.Filled.AudioFile" Color="Color.Info" /> @release.FormattedMediaSize</MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
 
@@ -91,9 +91,15 @@
                         <MudText Class="@($"media-{(media.IsValid ? "valid" : "invalid")}")" Typo="Typo.subtitle1">Media Number: @media.MediaNumber</MudText>
                         @foreach (var track in media.Tracks)
                         {
-                            <MudText Class="@($"track-{(track.IsValid ? "valid": "invalid")} track-status-{track.Status.ToString().ToLower()} truncate-text")" style="width:250px;" aria-description="@track.Title" Typo="Typo.body2">
-                                <MudChip Variant="Variant.Text" Color="Color.Primary">@track.TrackNumber</MudChip> @track.Title
-                            </MudText>
+                            <div class="@($"track-{(track.IsValid ? "valid": "invalid")} track-list track-status-{track.Status.ToString().ToLower()} truncate-text")" aria-description="@track.Title">
+                                <div class="track-list-tracknumber-container">
+                                    <MudChip Class="track-list-tracknumber justify-start" Variant="Variant.Text" Size="Size.Medium" Color="Color.Primary">@track.TrackNumber.ToStringPadLeft(3)</MudChip>
+                                </div>
+                                <div class="track-list-detail-container">
+                                    <div class="track-list-title">@track.Title</div>
+                                    <div class="track-list-artist">@track?.TrackArtist?.ArtistData?.Text</div>
+                                </div>
+                            </div>
                         }
                     }                                      
                 </MudCardContent>

@@ -24,3 +24,27 @@
 .release-invalid, .media-invalid, .track-invalid { 
     background-color: tomato !important;
 }
+
+.track-list {
+    margin-bottom: 3px;
+}
+
+.track-list-tracknumber-container {
+    display:inline-block;
+}
+
+.track-list-detail-container {
+    display:inline-block;
+    vertical-align: middle;
+}
+.track-list-tracknumber > .mud-chip-content {
+    width: 23px;
+}
+
+.track-list-title{
+    font-size: 14px;
+}
+
+.track-list-artist {
+    font-size: 10px;
+}

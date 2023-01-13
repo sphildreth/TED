@@ -35,6 +35,7 @@ namespace TED.Processors
                         var trackForFile = release.Media.SelectMany(x => x.Tracks).FirstOrDefault(x => string.Equals(x.FileName, fullPathToFile, StringComparison.OrdinalIgnoreCase));
                         fileAtl.AlbumArtist = releaseArtist;
                         fileAtl.Album = release.ReleaseData?.Text;
+                        fileAtl.Comment = null;
                         fileAtl.TrackNumber = trackForFile.TrackNumber;
                         fileAtl.TrackTotal = release.Media.FirstOrDefault(x => x.TrackById(trackForFile.Id) != null)?.TrackCount;
                         fileAtl.Title = trackForFile.Title;

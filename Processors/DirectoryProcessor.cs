@@ -11,7 +11,7 @@ namespace TED.Processors
 {
     public sealed class DirectoryProcessor
     {
-        private static readonly Regex _hasFeatureFragmentsRegex = new(@"\((ft.|feat.|featuring|feature)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _hasFeatureFragmentsRegex = new(@"(ft.|feat.|featuring)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|((,|self|bonus|release|remaster|remastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -175,7 +175,7 @@ namespace TED.Processors
                                     Id = Guid.NewGuid(),
                                     Status = (x.FileInfo()?.Exists ?? false) ? Statuses.New : Statuses.Missing,
                                     Title = x.Title.CleanString(),
-                                    TrackArtist = string.IsNullOrWhiteSpace(x.Artist) || string.Equals(releaseData.Artist.Value, x.Artist, StringComparison.OrdinalIgnoreCase) ? null : new Artist
+                                    TrackArtist = StringExt.DoStringsMatch(releaseData.Artist.Text, x.Artist) ? null : new Artist
                                     {
                                         ArtistData = new Models.DataToken
                                         {
@@ -234,6 +234,11 @@ namespace TED.Processors
                                 if (trackStatusCheckData.Item2 != null)
                                 {
                                     releaseData.ProcessingMessages.AddRange(trackStatusCheckData.Item2);
+                                }
+                                if(track?.t?.TrackArtist?.ArtistData?.Text != null && StringHasFeaturingFragments(track?.t?.TrackArtist?.ArtistData?.Text))
+                                {
+                                    track.t.Status = Statuses.NeedsAttention;
+                                    releaseData.ProcessingMessages.Add(new ProcessMessage($"Track [{track.t.ToString()}] TrackArtist has featuring fragments", false, ProcessMessage.BadCheckMark));
                                 }
                             }
                             if (releaseData.Status != Statuses.Reviewed && media.v.MediaNumber != media.i + 1)
@@ -376,9 +381,9 @@ namespace TED.Processors
 
         private static bool AllTracksForHaveSameArtist(string albumArtist, IEnumerable<ATL.Track> atlTracksForRelease)
         {
-            if (!atlTracksForRelease.Any())
+            if (atlTracksForRelease.Any())
             {
-                return false;
+                return true;
             }
             var tracksGroupedByArtist = atlTracksForRelease.GroupBy(x => x.AlbumArtist);
             return string.Equals(tracksGroupedByArtist.First().Key, albumArtist) && tracksGroupedByArtist.Count() == 1;
@@ -441,7 +446,7 @@ namespace TED.Processors
             {
                 return (release.Status, null);
             }
-            if (TrackArtistHasReleaseArtist(release, track) || TrackHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty, track?.Title ?? string.Empty, track.TrackNumber))
+            if (TrackArtistHasReleaseArtist(release, track) || StringHasFeaturingFragments(track?.Title ?? string.Empty) || TrackHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty, track?.Title ?? string.Empty, track.TrackNumber))
             {
                 return (Statuses.NeedsAttention, new List<ProcessMessage> { ProcessMessage.MakeBadMessage($"Track [{track}] Title has unwanted text.") });
             }
@@ -456,7 +461,7 @@ namespace TED.Processors
             return false;
         }
 
-        private static bool TrackHasFeaturingFragments(string input)
+        public static bool StringHasFeaturingFragments(string input)
         {
             if (string.IsNullOrWhiteSpace(input))
             {
