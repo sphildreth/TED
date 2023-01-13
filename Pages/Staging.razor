@@ -18,7 +18,8 @@
         <MudProgressLinear Vertical="true" Striped="true" Color="Color.Primary" Size="Size.Small" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
     </MudPaper>
     <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.ScreenSearchDesktop" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>
-    <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="mx-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
+    <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
+    <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Warning" Size="Size.Medium" OnClick="@((e) => DeleteChecked())">Delete</MudButton>
     <MudSpacer />
     @if (_releases.Any(x => x.Status != Enums.Statuses.Ok))
     {
@@ -144,6 +145,34 @@
         UriHelper.NavigateTo($"/editrelease/{ System.Net.WebUtility.UrlEncode(release.Directory) }");
     }
 
+    async Task DeleteChecked()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", "Continue to delete selected directories? This process cannot be undone.");
+        parameters.Add("ButtonText", "Delete");
+        parameters.Add("Color", Color.Error);
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<Dialog>("Delete Selected Directories", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            _movingFolders = true;
+            var selectedReleases = _releases.Where(x => x.Selected).ToArray();
+            _directorysFound = selectedReleases.Count();
+            _processingDirectoryProgress = 0;
+            Parallel.ForEach(selectedReleases, async selectedRelease =>
+            {
+                Directory.Delete(selectedRelease.Directory, true);
+                _releases.Remove(_releases.First(x => x.Directory == selectedRelease.Directory));
+                _processingDirectoryProgress++;
+                await InvokeAsync(StateHasChanged);
+            });
+            _processingDirectoryProgress = 0;
+            StateHasChanged();
+            _movingFolders = false;
+        }
+    }
+
     async Task MoveCheckedToInbound()
     {
         _movingFolders = true;
@@ -151,11 +180,14 @@
         var selectedReleases = _releases.Where(x => x.Selected);
         _directorysFound = selectedReleases.Count();
         _processingDirectoryProgress = 0;
-        Parallel.ForEach(selectedReleases, selectedRelease =>
+        var now = DateTime.UtcNow;
+        var saveProcessor = new ReleaseSaveProcessor();
+        Parallel.ForEach(selectedReleases, async selectedRelease =>
         {
+            await saveProcessor.ProcessAsync(now, selectedRelease);
             DirectoryProcessor.MoveFolder(selectedRelease.Directory, Path.Combine(inboundDirectory, new DirectoryInfo(selectedRelease.Directory).Name));
             _processingDirectoryProgress++;
-            InvokeAsync(StateHasChanged);
+            await InvokeAsync(StateHasChanged);
         });
         _processingDirectoryProgress = 0;
         StateHasChanged();
@@ -196,7 +228,7 @@
                     if (filesInSubDirectory.Any())
                     {
                         var releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, filesInSubDirectory)).Adapt<StagingRelease>();
-                        if (releaseForDirectory != null)
+                        if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
                         {
                             releaseForDirectory.Selected = releaseForDirectory.IsValid;
                             _releases.Add(releaseForDirectory);

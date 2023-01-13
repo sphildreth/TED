@@ -1,4 +1,5 @@
-﻿using TED.Models.MetaData;
+﻿using TED.Extensions;
+using TED.Models.MetaData;
 
 namespace TED.Processors
 {
@@ -38,10 +39,14 @@ namespace TED.Processors
                         fileAtl.TrackTotal = release.Media.FirstOrDefault(x => x.TrackById(trackForFile.Id) != null)?.TrackCount;
                         fileAtl.Title = trackForFile.Title;
                         fileAtl.Year = release.ReleaseDateDateTime?.Year ?? throw new Exception("Invalid Release year");
-                        var trackArtist = trackForFile.TrackArtist?.ArtistData?.Text;
+                        var trackArtist = trackForFile.TrackArtist?.ArtistData?.Text.Nullify();
                         if (trackArtist != null && !string.Equals(trackArtist, releaseArtist, StringComparison.OrdinalIgnoreCase))
                         {
                             fileAtl.Artist = trackArtist;
+                        }
+                        else
+                        {
+                            fileAtl.Artist = null;
                         }
                         if (!fileAtl.Save())
                         {

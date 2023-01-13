@@ -1,4 +1,5 @@
 ﻿@page "/editrelease/{releaseDirectory}"
+
 @using TED.Models.MetaData;
 @using TED.Processors;
 @using System.Text.RegularExpressions
@@ -8,7 +9,10 @@
 <PageTitle>Editing Release</PageTitle>
 
 <MudToolBar DisableGutters=true>
-    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.Numbers" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await RenumberTracks())">Renumber Tracks</MudButton>
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.Delete" Color="Color.Warning" Size="Size.Medium" OnClick="@( async (e) => await DeleteRelease())">Delete</MudButton>
+    <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Filled.Numbers" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await RenumberTracks())">Renumber Tracks</MudButton>
+    <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Filled.CalendarMonth" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await SetYearToCurrent())">Set Year To Current</MudButton>
+    <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Filled.Person" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await PromoteTrackArtist())">Promote Track Artist</MudButton>
 </MudToolBar>
 
 <div Class="d-flex flex-wrap">
@@ -82,7 +86,7 @@
                                                   Immediate="true"/>
                                     </td>
                                         <td>
-                                            <MudTextField @bind-Value="@track.TrackArtist.ArtistData.Text"
+                                            <MudTextField T="string" @bind-Value="@track.TrackArtist.ArtistData.Text"
                                                   For="@(() => @track.TrackArtist.ArtistData.Text)"
                                                   Immediate="true" />
                                         </td>
@@ -160,6 +164,13 @@
 
     //    OrderDetailsModelFluentValidator orderDetailsValidator = new OrderDetailsModelFluentValidator();
 
+    private async Task DeleteRelease()
+    {
+        Directory.Delete(_release.Directory, true);
+        Snackbar.Add("Deleted!");
+        NavigationManager.NavigateTo("/staging");
+    }
+
     private async Task RenumberTracks()
     {
         var looper = 1;
@@ -173,6 +184,26 @@
             }            
         }
         _release.TrackCount = looper;
+    }
+
+    private async Task PromoteTrackArtist()
+    {
+        _release.Artist = _release.Media.First().Tracks.First().TrackArtist.ArtistData;
+        foreach (var media in _release.Media)
+        {
+            foreach (var track in media.Tracks)
+            {
+                track.TrackArtist = new Artist()
+                {
+                    ArtistData = new Models.DataToken()
+                };
+            }
+        }
+    }
+
+    private async Task SetYearToCurrent()
+    {
+        _release.ReleaseDateDateTime = DateTime.UtcNow;
     }
 
     private async Task Submit()

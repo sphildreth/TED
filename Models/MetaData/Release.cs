@@ -1,4 +1,5 @@
 using NodaTime;
+using System.Reflection.Metadata.Ecma335;
 using System.Text.Json.Serialization;
 using TED.Enums;
 using TED.Extensions;
@@ -86,8 +87,21 @@ namespace TED.Models.MetaData
 
         public int? Year { get; set; }
 
+        private DateTime? _releaseDateDateTime = DateTime.MinValue;
+
         [JsonIgnore]
-        public DateTime? ReleaseDateDateTime { get; set; } = DateTime.MinValue;
+        public DateTime? ReleaseDateDateTime
+        {
+            get => _releaseDateDateTime;
+            set
+            {
+                if (value.HasValue)
+                {
+                    Year = value.Value.Year;
+                }
+                _releaseDateDateTime = value;
+            }
+        }
 
         public int? TrackCount { get; set; }
 

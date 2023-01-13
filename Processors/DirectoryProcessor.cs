@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Security;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using TED.Enums;
 using TED.Extensions;
@@ -24,6 +25,8 @@ namespace TED.Processors
 
         public async Task<Release?> ProcessAsync(DateTime now, string? dir, string[] filesInDirectory)
         {
+            await CheckIfDirectoryHasMultipleReleases(now, dir);
+
             var allfileAtlsFound = new List<ATL.Track>();
             string? directorySFVFile = null;
             string? directoryM3UFile = null;
@@ -32,11 +35,13 @@ namespace TED.Processors
             if (string.IsNullOrEmpty(dir))
             {
                 release.ProcessingMessages.Add(ProcessMessage.MakeBadMessage("Invalid dir"));
+                release.Status = Statuses.NoMediaFiles;
                 return release;
             }
             if (!filesInDirectory.Any())
             {
                 release.ProcessingMessages.Add(ProcessMessage.MakeBadMessage("No files found in dir"));
+                release.Status = Statuses.NoMediaFiles;
                 return release;
             }
             try
@@ -188,21 +193,23 @@ namespace TED.Processors
                         releaseData.Duration = medias.SelectMany(x => x.Tracks).Sum(x => x.Duration);
                         if (releaseData.Status == Enums.Statuses.Ok && directorySFVFile.Nullify() != null)
                         {
-                            var doesTrackCountMatchSFVCount = releaseData.TrackCount == await GetMp3CountFromSFVFile(directorySFVFile);
+                            var mp3CountFromSFVFile = await GetMp3CountFromSFVFile(directorySFVFile);
+                            var doesTrackCountMatchSFVCount = releaseData.TrackCount == mp3CountFromSFVFile;
                             if (!doesTrackCountMatchSFVCount)
                             {
                                 releaseData.Status = Enums.Statuses.Incomplete;
                             }
-                            releaseData.ProcessingMessages.Add(new ProcessMessage("Checked TrackCount with SFV", doesTrackCountMatchSFVCount, doesTrackCountMatchSFVCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
+                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Checked TrackCount with SFV expected [{mp3CountFromSFVFile}] found [{releaseData.TrackCount}]", doesTrackCountMatchSFVCount, doesTrackCountMatchSFVCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
                         }
                         if (releaseData.Status == Enums.Statuses.Ok && directoryM3UFile.Nullify() != null)
                         {
-                            var doesTrackCountMatchM3UCount = releaseData.TrackCount == await GetMp3CountFromM3UFile(directoryM3UFile);
+                            var mp3CountFromM3UFile = await GetMp3CountFromM3UFile(directoryM3UFile);
+                            var doesTrackCountMatchM3UCount = releaseData.TrackCount == mp3CountFromM3UFile;
                             if (!doesTrackCountMatchM3UCount)
                             {
                                 releaseData.Status = Enums.Statuses.Incomplete;
                             }
-                            releaseData.ProcessingMessages.Add(new ProcessMessage("Checked TrackCount with M3U", doesTrackCountMatchM3UCount, doesTrackCountMatchM3UCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
+                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Checked TrackCount with M3U expected [{mp3CountFromM3UFile}] found [{releaseData.TrackCount}]", doesTrackCountMatchM3UCount, doesTrackCountMatchM3UCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
                         }
                         if(releaseData.Status == Statuses.Ok)
                         {
@@ -269,7 +276,7 @@ namespace TED.Processors
                             ));
                         releaseData.ProcessingMessages.Add(new ProcessMessage
                             (
-                                $"Release {(releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? "does not " : "does")} need editing",
+                                $"Release {(releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? "does not require" : "requires")} editing",
                                 releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok,
                                 releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
                             ));
@@ -318,7 +325,43 @@ namespace TED.Processors
             return release;
         }
 
-        private void ProcessSubDirectory(string releaseFolder, DirectoryInfo subDirectory)
+        public async Task CheckIfDirectoryHasMultipleReleases(DateTime now, string? dir)
+        {
+            var allSFVFilesInReleaseDirectory = Directory.GetFiles(dir, "*.sfv");
+            if(allSFVFilesInReleaseDirectory.Count() > 1)
+            {
+                foreach(var it in allSFVFilesInReleaseDirectory.Skip(1).Select((x, i) => new { Value = x, Index = i }))
+                {
+                    var sfvFilename = Path.GetFileName(it.Value);
+                    var parentDirectory = Directory.GetParent(dir).FullName;
+                    var newReleaseDirectory = Path.Combine(parentDirectory, $"{(new DirectoryInfo(dir)).Name} ({it.Index})");
+                    if (!Directory.Exists(newReleaseDirectory))
+                    {
+                        Directory.CreateDirectory(newReleaseDirectory);
+                    }
+                    var newSfvFilename = Path.Combine(newReleaseDirectory, sfvFilename);
+                    File.Move(it.Value, newSfvFilename, true);
+                    foreach (var line in await File.ReadAllLinesAsync(newSfvFilename))
+                    {
+                        if (IsLineForFileForTrack(line))
+                        {
+                            var fileNameFromLine = Mp3FileNameFromSFVLine(line);
+                            var fileNameToMove = Path.Combine(dir, fileNameFromLine);
+                            if (File.Exists(fileNameToMove))
+                            {
+                                File.Move(fileNameToMove, Path.Combine(newReleaseDirectory, fileNameFromLine), true);
+                            }
+                        }
+                    }
+                    foreach(var fileNamedLikeSFV in Directory.GetFiles(dir, $"{sfvFilename}*.*"))
+                    {
+                        File.Move(Path.Combine(dir, fileNamedLikeSFV), Path.Combine(newReleaseDirectory, fileNamedLikeSFV), true);
+                    }
+                }
+            }
+        }
+
+        private void ProcessSubDirectory(string releaseDirectory, DirectoryInfo subDirectory)
         {
             var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
             coverImages.AddRange((ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.ReleaseSecondary) ?? Enumerable.Empty<FileInfo>()));
@@ -326,7 +369,7 @@ namespace TED.Processors
             {
                 Parallel.ForEach(coverImages, coverImage =>
                 {
-                    File.Move(coverImage.FullName, Path.Combine(releaseFolder, coverImage.Name), true);
+                    File.Move(coverImage.FullName, Path.Combine(releaseDirectory, coverImage.Name), true);
                 });
             }
         }
@@ -498,7 +541,17 @@ namespace TED.Processors
             return result;
         }
 
-        private static bool IsLineForFileForTrack(string lineFromFile)
+        public static string? Mp3FileNameFromSFVLine(string? lineFromFile)
+        {
+            if (string.IsNullOrWhiteSpace(lineFromFile))
+            {
+                return null;
+            }
+            var parts = lineFromFile.Split(' ');
+            return parts.Take(parts.Length - 1).ToCsv(" ");
+        }
+
+        public static bool IsLineForFileForTrack(string lineFromFile)
         {
             if (string.IsNullOrWhiteSpace(lineFromFile))
             {
