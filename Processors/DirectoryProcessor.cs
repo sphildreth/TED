@@ -1,5 +1,5 @@
-﻿using Mapster;
-using System.Security;
+﻿using FFMpegCore;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using TED.Enums;
@@ -155,6 +155,11 @@ namespace TED.Processors
                             releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : Statuses.Incomplete;
                             releaseData.ProcessingMessages.Add(new ProcessMessage("CoverImage not found.", false, ProcessMessage.BadCheckMark));
                         }
+                        var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => !string.Equals(x.AudioFormat.ShortName, "mpeg", StringComparison.OrdinalIgnoreCase));
+                        if (doesReleaseHaveNonMp3Tracks)
+                        {
+                            tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound);
+                        }
                         var medias = new List<ReleaseMedia>();
                         foreach (var mp3TagData in tagsFilesFound.GroupBy(x => x.DiscNumber))
                         {
@@ -212,13 +217,13 @@ namespace TED.Processors
                             }
                             releaseData.ProcessingMessages.Add(new ProcessMessage($"Checked TrackCount with M3U expected [{mp3CountFromM3UFile}] found [{releaseData.TrackCount}]", doesTrackCountMatchM3UCount, doesTrackCountMatchM3UCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
                         }
-                        if(releaseData.Status == Statuses.Ok)
+                        if (releaseData.Status == Statuses.Ok)
                         {
                             var doAllTracksHaveSameAlbumArtist = AllTracksForHaveSameArtist(releaseData.Artist.Text, tagsFilesFound);
                             if (!doAllTracksHaveSameAlbumArtist)
                             {
                                 releaseData.Status = Enums.Statuses.NeedsAttention;
-                                releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Tracks have different Album Artists [{tagsFilesFound.GroupBy(x => x.Artist).Select(x => x.Key).ToCsv() }]"));
+                                releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Tracks have different Album Artists [{tagsFilesFound.GroupBy(x => x.Artist).Select(x => x.Key).ToCsv()}]"));
                             }
                         }
                         if (releaseData.Status == Statuses.Ok)
@@ -244,7 +249,7 @@ namespace TED.Processors
                                 {
                                     releaseData.ProcessingMessages.AddRange(trackStatusCheckData.Item2);
                                 }
-                                if(track?.t?.TrackArtist?.ArtistData?.Text != null && StringHasFeaturingFragments(track?.t?.TrackArtist?.ArtistData?.Text))
+                                if (track?.t?.TrackArtist?.ArtistData?.Text != null && StringHasFeaturingFragments(track?.t?.TrackArtist?.ArtistData?.Text))
                                 {
                                     track.t.Status = Statuses.NeedsAttention;
                                     releaseData.ProcessingMessages.Add(new ProcessMessage($"Track [{track.t.ToString()}] TrackArtist has featuring fragments", false, ProcessMessage.BadCheckMark));
@@ -342,9 +347,9 @@ namespace TED.Processors
         public async Task CheckIfDirectoryHasMultipleReleases(DateTime now, string? dir)
         {
             var allSFVFilesInReleaseDirectory = Directory.GetFiles(dir, "*.sfv");
-            if(allSFVFilesInReleaseDirectory.Count() > 1)
+            if (allSFVFilesInReleaseDirectory.Count() > 1)
             {
-                foreach(var it in allSFVFilesInReleaseDirectory.Skip(1).Select((x, i) => new { Value = x, Index = i }))
+                foreach (var it in allSFVFilesInReleaseDirectory.Skip(1).Select((x, i) => new { Value = x, Index = i }))
                 {
                     var sfvFilename = Path.GetFileName(it.Value);
                     var parentDirectory = Directory.GetParent(dir).FullName;
@@ -367,9 +372,9 @@ namespace TED.Processors
                             }
                         }
                     }
-                    foreach(var fileNamedLikeSFV in Directory.GetFiles(dir, $"{sfvFilename}*.*"))
+                    foreach (var fileNamedLikeSFV in Directory.GetFiles(dir, $"{Path.GetFileNameWithoutExtension(sfvFilename)}*.*"))
                     {
-                        File.Move(Path.Combine(dir, fileNamedLikeSFV), Path.Combine(newReleaseDirectory, fileNamedLikeSFV), true);
+                        File.Move(fileNamedLikeSFV, Path.Combine(newReleaseDirectory, Path.GetFileName(fileNamedLikeSFV)), true);
                     }
                 }
             }
@@ -438,6 +443,35 @@ namespace TED.Processors
                 }, 0, secondaryReleaseImagesInDirectory.Count());
             }
             return (null, 0, 0);
+        }
+
+        private async Task<IEnumerable<ATL.Track>> ConvertToMp3(string dir, IEnumerable<ATL.Track> atlTracks)
+        {
+            var result = new ConcurrentBag<ATL.Track>();
+            await Parallel.ForEachAsync(atlTracks.Where(x => !string.Equals(x.AudioFormat.ShortName, "mpeg", StringComparison.OrdinalIgnoreCase)), async (atlTrack, cancellationTokenfile) =>
+            {
+                var trackFileInfo = atlTrack.FileInfo();
+                var trackDirectory = trackFileInfo?.Directory?.FullName ?? throw new Exception("Invalid FileInfo For Track");
+                var newFileName = Path.Combine(trackDirectory, $"{Path.GetFileNameWithoutExtension(trackFileInfo.Name)}.mp3");
+
+                await FFMpegArguments.FromFileInput(trackFileInfo)
+                                     .OutputToFile(newFileName, true, options =>
+                                     {
+                                         options.WithAudioBitrate(FFMpegCore.Enums.AudioQuality.Ultra);
+                                         options.WithAudioCodec("mp3").ForceFormat("mp3");
+                                     }).ProcessAsynchronously(true);
+                var newAtl = new ATL.Track(newFileName);
+                if(string.Equals(newAtl.AudioFormat.ShortName, "mpeg", StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Add(newAtl);
+                    trackFileInfo.Delete();
+                }
+                else
+                {
+                    throw new Exception($"Unable to convert [{trackFileInfo.FullName}] to MP3");
+                }
+            });
+            return result;
         }
 
         private static (Statuses, IEnumerable<ProcessMessage>?) CheckReleaseStatus(Release release)
