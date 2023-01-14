@@ -5,8 +5,11 @@ namespace TED.Processors
 {
     public sealed class ReleaseSaveProcessor
     {
-        public ReleaseSaveProcessor()
+        private readonly ILogger _logger;
+
+        public ReleaseSaveProcessor(ILogger<ReleaseSaveProcessor> logger)
         {
+            _logger = logger;
         }
 
         public async Task<(bool, IEnumerable<string>?)> ProcessAsync(DateTime now, Release release)
@@ -34,20 +37,20 @@ namespace TED.Processors
                     {
                         var trackForFile = release.Media.SelectMany(x => x.Tracks).FirstOrDefault(x => string.Equals(x.FileName, fullPathToFile, StringComparison.OrdinalIgnoreCase));
                         fileAtl.AlbumArtist = releaseArtist;
-                        fileAtl.Album = release.ReleaseData?.Text;
-                        fileAtl.Comment = null;
+                        fileAtl.Album = release.ReleaseData?.Text ?? throw new Exception("Invalid Release Title");
+                        fileAtl.Comment = string.Empty;
                         fileAtl.TrackNumber = trackForFile.TrackNumber;
                         fileAtl.TrackTotal = release.Media.FirstOrDefault(x => x.TrackById(trackForFile.Id) != null)?.TrackCount;
                         fileAtl.Title = trackForFile.Title;
                         fileAtl.Year = release.ReleaseDateDateTime?.Year ?? throw new Exception("Invalid Release year");
                         var trackArtist = trackForFile.TrackArtist?.ArtistData?.Text.Nullify();
-                        if (trackArtist != null && !string.Equals(trackArtist, releaseArtist, StringComparison.OrdinalIgnoreCase))
+                        if (trackArtist != null && !StringExt.DoStringsMatch(releaseArtist, trackArtist))
                         {
                             fileAtl.Artist = trackArtist;
                         }
                         else
                         {
-                            fileAtl.Artist = null;
+                            fileAtl.Artist = string.Empty;
                         }
                         if (!fileAtl.Save())
                         {
@@ -58,6 +61,7 @@ namespace TED.Processors
             }
             catch (Exception ex)
             {
+                _logger.LogError("Error Saving [{ release }] [{ error}]", release.ToString(), ex.Message);
                 errorMessages.Add(ex.Message);
             }
 

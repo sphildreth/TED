@@ -5,9 +5,12 @@
 @using TED.Processors;
 @using TED.Utility;
 @using TED.Extensions;
+
 @inject IDialogService DialogService
 @inject IConfiguration Configuration
 @inject NavigationManager UriHelper
+@inject ILogger<DirectoryProcessor> directoryProcessorlogger
+@inject ILogger<ReleaseSaveProcessor> releaseProcessorLogger
 
 @page "/staging"
 
@@ -23,17 +26,17 @@
     <MudSpacer />
     @if (_releases.Any(x => x.Status != Enums.Statuses.Ok))
     {
-        <MudBadge Content="@_releases.Count(x => x.Status == Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
+        <MudBadge Size="Size.Medium" Content="@_releases.Count(x => x.Status == Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
             <MudIcon Icon="@Icons.Material.Outlined.Folder" Color="Color.Success" />
         </MudBadge>
-        <MudBadge Content="@_releases.Count(x => x.Status != Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
+        <MudBadge Size="Size.Medium" Content="@_releases.Count(x => x.Status != Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
             <MudIcon Icon="@Icons.Material.Outlined.Folder" Color="Color.Warning" />
         </MudBadge>
     }
-    <MudBadge Content="@_releases.Count()" Overlap="true" Class="mx-3 my-4">
+    <MudBadge Max="10000" Size="Size.Medium" Content="@_releases.Count()" Overlap="true" Class="mx-3 my-4">
         <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Default" />
     </MudBadge>
-    <MudBadge Content="@_releases.Sum(x => x.TrackCount)" Overlap="true" Class="mx-3 my-4">
+    <MudBadge Max="10000" Size="Size.Medium" Content="@_releases.Sum(x => x.TrackCount)" Overlap="true" Class="mx-3 my-4">
         <MudIcon Icon="@Icons.Material.Filled.AudioFile" Color="Color.Default" />
     </MudBadge>
 </MudToolBar>
@@ -121,8 +124,9 @@
     List<StagingRelease> _releases = new List<StagingRelease>();
     int _directorysFound = 0;
     int _processingDirectoryProgress = 0;
+
     public Staging()
-    {
+    {        
     }
 
     void OpenReleaseDirectory(string dir)
@@ -187,8 +191,8 @@
         _directorysFound = selectedReleases.Count();
         _processingDirectoryProgress = 0;
         var now = DateTime.UtcNow;
-        var saveProcessor = new ReleaseSaveProcessor();
-        Parallel.ForEach(selectedReleases, async selectedRelease =>
+        var saveProcessor = new ReleaseSaveProcessor(releaseProcessorLogger);
+        await Parallel.ForEachAsync(selectedReleases, async (selectedRelease, cancellationToken) =>
         {
             await saveProcessor.ProcessAsync(now, selectedRelease);
             DirectoryProcessor.MoveFolder(selectedRelease.Directory, Path.Combine(inboundDirectory, new DirectoryInfo(selectedRelease.Directory).Name));
@@ -210,15 +214,18 @@
             var now = DateTime.UtcNow;
             _releases = new List<StagingRelease>();
             var directoryToScan = @Configuration["TED:StagingDirectory"];
-            var directoryProcessor = new DirectoryProcessor();
+            var directoryProcessor = new DirectoryProcessor(directoryProcessorlogger);
             var directorysToProcess = Directory.EnumerateDirectories(directoryToScan);
             _directorysFound = directorysToProcess.Count();
+            var sw = new System.Diagnostics.Stopwatch();
             foreach (var dir in directorysToProcess)
             {
+                sw.Start();
+                StagingRelease? releaseForDirectory = null;
                 var filesInDirectory = Directory.GetFiles(dir);
                 if (filesInDirectory.Any())
                 {
-                    var releaseForDirectory = (await directoryProcessor.ProcessAsync(now, dir, filesInDirectory)).Adapt<StagingRelease>();
+                    releaseForDirectory = (await directoryProcessor.ProcessAsync(now, dir, filesInDirectory)).Adapt<StagingRelease>();
                     if (releaseForDirectory != null)
                     {
                         if (releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
@@ -233,13 +240,18 @@
                     var filesInSubDirectory = Directory.GetFiles(subDir);
                     if (filesInSubDirectory.Any())
                     {
-                        var releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, filesInSubDirectory)).Adapt<StagingRelease>();
+                        releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, filesInSubDirectory)).Adapt<StagingRelease>();
                         if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
                         {
                             releaseForDirectory.Selected = releaseForDirectory.IsValid;
                             _releases.Add(releaseForDirectory);
                         }
                     }
+                }
+                sw.Stop();
+                if (releaseForDirectory != null)
+                {
+                    releaseProcessorLogger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", dir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
                 }
                 _processingDirectoryProgress++;
                 StateHasChanged();
