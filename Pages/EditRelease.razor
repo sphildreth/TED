@@ -1,5 +1,6 @@
 ﻿@page "/editrelease/{releaseDirectory}"
 
+@using TED.Enums;
 @using TED.Models.MetaData;
 @using TED.Processors;
 @using System.Text.RegularExpressions
@@ -9,7 +10,8 @@
 <PageTitle>Editing Release</PageTitle>
 
 <MudToolBar DisableGutters=true>
-    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Warning" Size="Size.Medium" OnClick="@( async (e) => await DeleteRelease())">Delete</MudButton>
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Medium" OnClick="@( async (e) => await DeleteRelease())">Delete</MudButton>
+    <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Remove" Color="Color.Warning" Size="Size.Medium" OnClick="@( async (e) => await DeleteReleaseImages())">Delete Release Images</MudButton>
     <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Numbers" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await RenumberTracks())">Renumber Tracks</MudButton>
     <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.CalendarMonth" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await SetYearToCurrent())">Set Year To Current</MudButton>
     <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Person" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await PromoteTrackArtist())">Promote Track Artist</MudButton>
@@ -25,6 +27,7 @@
 
 
 @using FluentValidation
+@using TED.Utility;
 
 <MudGrid>
     <MudItem xs="8">
@@ -169,6 +172,27 @@
         Directory.Delete(_release.Directory, true);
         Snackbar.Add("Deleted!");
         NavigationManager.NavigateTo("/staging");
+    }
+
+    private async Task DeleteReleaseImages()
+    {
+        _release.CoverImage = null;
+        var releaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(_release.Directory), ImageType.Release, SearchOption.TopDirectoryOnly);
+        if (releaseImagesInDirectory?.Any() ?? false)
+        {
+            Parallel.ForEach(releaseImagesInDirectory, releaseImageInDirectory =>
+            {
+                releaseImageInDirectory.Delete();
+            });
+        }
+        var secondaryReleaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(_release.Directory), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
+        if (secondaryReleaseImagesInDirectory?.Any() ?? false)
+        {
+            Parallel.ForEach(secondaryReleaseImagesInDirectory, secondaryReleaseImageInDirectory =>
+            {
+                secondaryReleaseImageInDirectory.Delete();
+            });
+        }
     }
 
     private async Task RenumberTracks()

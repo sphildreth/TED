@@ -426,13 +426,13 @@ namespace TED.Processors
 
         private static async Task<(Image?, int, int)> FirstReleaseImageInDirectory(string dir, string[] filesInDirectory)
         {
-            var releasetImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Release, SearchOption.TopDirectoryOnly);
-            if (releasetImagesInDirectory?.Any() ?? false)
+            var releaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Release, SearchOption.TopDirectoryOnly);
+            if (releaseImagesInDirectory?.Any() ?? false)
             {
                 return (new Image
                 {
-                    Bytes = await File.ReadAllBytesAsync(releasetImagesInDirectory.First().FullName)
-                }, releasetImagesInDirectory.Count(), 0);
+                    Bytes = await File.ReadAllBytesAsync(releaseImagesInDirectory.First().FullName)
+                }, releaseImagesInDirectory.Count(), 0);
             }
             var secondaryReleaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
             if (secondaryReleaseImagesInDirectory?.Any() ?? false)
@@ -441,6 +441,15 @@ namespace TED.Processors
                 {
                     Bytes = await File.ReadAllBytesAsync(secondaryReleaseImagesInDirectory.First().FullName)
                 }, 0, secondaryReleaseImagesInDirectory.Count());
+            }
+            var directoryInfo = new DirectoryInfo(dir);
+            var releaseImagesInParentDirectory = ImageHelper.FindImageTypeInDirectory(directoryInfo.Parent, ImageType.Release, SearchOption.TopDirectoryOnly);
+            if (releaseImagesInParentDirectory?.Any() ?? false)
+            {
+                return (new Image
+                {
+                    Bytes = await File.ReadAllBytesAsync(releaseImagesInParentDirectory.First().FullName)
+                }, releaseImagesInDirectory.Count(), 0);
             }
             return (null, 0, 0);
         }
