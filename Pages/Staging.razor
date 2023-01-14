@@ -9,6 +9,7 @@
 @inject IDialogService DialogService
 @inject IConfiguration Configuration
 @inject NavigationManager UriHelper
+@inject ILogger<Staging> logger
 @inject ILogger<DirectoryProcessor> directoryProcessorlogger
 @inject ILogger<ReleaseSaveProcessor> releaseProcessorLogger
 
@@ -21,6 +22,14 @@
         <MudProgressLinear Vertical="true" Striped="true" Color="Color.Primary" Size="Size.Small" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
     </MudPaper>
     <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.ScreenSearchDesktop" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>
+    <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Filter" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Filter">
+        <MudMenuItem OnClick="@( (e) => FilterReleases(x => x != null, false))">No Filter</MudMenuItem>
+        <MudDivider />
+        <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.TrackCount < 4, true))">Less than 3 Tracks</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status != Enums.Statuses.Ok, false))">Needs Attention</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status == Enums.Statuses.Ok, true))">Ready to Move</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.DurationMinutes <= 10, true))">Under 10 Minutes</MudMenuItem>
+    </MudMenu>
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Warning" Size="Size.Medium" OnClick="@((e) => DeleteChecked())">Delete</MudButton>
     <MudSpacer />
@@ -122,6 +131,7 @@
     bool _scanning = false;
     bool _movingFolders = false;
     List<StagingRelease> _releases = new List<StagingRelease>();
+    List<StagingRelease> _allReleases = new List<StagingRelease>();
     int _directorysFound = 0;
     int _processingDirectoryProgress = 0;
 
@@ -155,6 +165,15 @@
         UriHelper.NavigateTo($"/editrelease/{ System.Net.WebUtility.UrlEncode(release.Directory) }");
     }
 
+    void FilterReleases(Func<StagingRelease, bool> filter, bool select)
+    {
+        _releases = _allReleases.Where(filter).ToList();
+        foreach (var r in _releases)
+        {
+            r.Selected = select;
+        }
+    }
+
     async Task DeleteChecked()
     {
         var parameters = new DialogParameters();
@@ -172,10 +191,17 @@
             _processingDirectoryProgress = 0;
             Parallel.ForEach(selectedReleases, async selectedRelease =>
             {
-                Directory.Delete(selectedRelease.Directory, true);
-                _releases.Remove(_releases.First(x => x.Directory == selectedRelease.Directory));
-                _processingDirectoryProgress++;
-                await InvokeAsync(StateHasChanged);
+                try
+                {
+                    Directory.Delete(selectedRelease.Directory, true);
+                    _releases.Remove(_releases.First(x => x.Directory == selectedRelease.Directory));
+                    _allReleases.Remove(_releases.First(x => x.Directory == selectedRelease.Directory));
+                    _processingDirectoryProgress++;
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch
+                {
+                }
             });
             _processingDirectoryProgress = 0;
             StateHasChanged();
@@ -251,7 +277,7 @@
                 sw.Stop();
                 if (releaseForDirectory != null)
                 {
-                    releaseProcessorLogger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", dir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
+                    logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", dir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
                 }
                 _processingDirectoryProgress++;
                 StateHasChanged();
@@ -260,6 +286,7 @@
             _scanning = false;
             _processingDirectoryProgress = 0;
             StateHasChanged();
+            _allReleases = _releases;
         }
     }
 }

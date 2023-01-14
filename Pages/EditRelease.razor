@@ -14,10 +14,14 @@
 <MudToolBar DisableGutters=true>
     <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Medium" OnClick="@( async (e) => await DeleteRelease())">Delete</MudButton>
     <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Remove" Color="Color.Warning" Size="Size.Medium" OnClick="@( async (e) => await DeleteReleaseImages())">Delete Release Images</MudButton>
-    <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Numbers" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await RenumberTracks())">Renumber Tracks</MudButton>
-    <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.CalendarMonth" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await SetYearToCurrent())">Set Year To Current</MudButton>
-    <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Person" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await PromoteTrackArtist())">Promote Track Artist</MudButton>
-    <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Remove" Color="Color.Info" Size="Size.Medium" Label="Trim Track Titles">
+    <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.CallToAction" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Modify Actions">
+        <MudMenuItem Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Person" OnClick="@( async (e) => await PromoteTrackArtist())">Promote Track Artist</MudMenuItem>
+        <MudMenuItem Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Numbers" OnClick="@( async (e) => await RenumberTracks())">Renumber Tracks</MudMenuItem>
+        <MudMenuItem Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Numbers" OnClick="@( async (e) => await RemoveArtistFromTrackArtists())">Remove Artist From Track Artists</MudMenuItem>
+        <MudMenuItem Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Numbers" OnClick="@( async (e) => await ReplaceTracksArtistSeperators())">Replace Track Artist Seperators</MudMenuItem>
+        <MudMenuItem Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.CalendarMonth" OnClick="@( async (e) => await SetYearToCurrent())">Set Year To Current</MudMenuItem>
+    </MudMenu>
+    <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.EditNote" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Trim Track Titles">
         <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(1))">1</MudMenuItem>
         <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(2))">2</MudMenuItem>
         <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(3))">3</MudMenuItem>
@@ -63,9 +67,9 @@
                                    DateFormat="yyyy-MM-dd" />
                     <MudSimpleTable Style="pa-4 overflow-x: auto;0" Hover="true" Striped="true">
                     <colgroup>
-                       <col span="1" style="width: 15%;">
-                       <col span="1" style="width: 15%;">
-                       <col span="1" style="width: 20%;">
+                       <col span="1" style="width: 10%;">
+                       <col span="1" style="width: 10%;">
+                       <col span="1" style="width: 30%;">
                        <col span="1" style="width: 50%;">
                     </colgroup>
                     <thead>
@@ -202,6 +206,50 @@
                 secondaryReleaseImageInDirectory.Delete();
             });
         }
+    }
+
+    private async Task RemoveArtistFromTrackArtists()
+    {
+        foreach (var media in _release.Media)
+        {
+            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
+            {
+                track.TrackArtist.ArtistData.Text = RemoveArtistFromTrackArtist(_release.Artist?.Text, track.TrackArtist.ArtistData.Text);
+            }
+        }
+    }
+
+    private async Task ReplaceTracksArtistSeperators()
+    {
+        foreach (var media in _release.Media)
+        {
+            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
+            {
+                track.TrackArtist.ArtistData.Text = ReplaceTrackArtistSeperators(track.TrackArtist.ArtistData.Text);
+            }
+        }
+    }
+
+    public static string ReplaceTrackArtistSeperators(string? trackArtist)
+    {
+        if (trackArtist.Nullify() == null)
+        {
+            return null;
+        }
+        return Regex.Replace(trackArtist, $"\\s*(&|ft|feat)\\s*",  "/").Trim();
+    }
+
+    public static string? RemoveArtistFromTrackArtist(string? artist, string? trackArtist)
+    {
+        if(artist.Nullify() == null)
+        {
+            return trackArtist;
+        }
+        if(trackArtist.Nullify() == null)
+        {
+            return null;
+        }
+        return Regex.Replace(trackArtist, $"\\s*({artist})\\s*(&|and|with)*", string.Empty).Trim();
     }
 
     private async Task RenumberTracks()

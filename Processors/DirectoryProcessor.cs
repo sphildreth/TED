@@ -14,7 +14,7 @@ namespace TED.Processors
     {
         private static readonly Regex _hasFeatureFragmentsRegex = new(@"(\sft[\s\.]|\sfeat[\s\.]|featuring)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|((self|bonus|release|remaster|remastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedTrackTitleTextRegex = new(@"(\s{2,}|(\s\(prod\s))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -438,7 +438,7 @@ namespace TED.Processors
             return (null, 0, 0);
         }
 
-        private static async Task<(Image?, int, int)> FirstReleaseImageInDirectory(string dir, string? releaseTitle, string[] filesInDirectory)
+        private async Task<(Image?, int, int)> FirstReleaseImageInDirectory(string dir, string? releaseTitle, string[] filesInDirectory)
         {
             var releaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Release, SearchOption.TopDirectoryOnly);
             if (releaseImagesInDirectory?.Any() ?? false)
@@ -465,28 +465,36 @@ namespace TED.Processors
                     Bytes = await File.ReadAllBytesAsync(releaseImagesInParentDirectory.First().FullName)
                 }, releaseImagesInDirectory.Count(), 0);
             }
-            string foundImageFileName = null;
-            var imagesByReleaseName = Directory.GetFiles(dir, $"{releaseTitle}*.jpg");
-            if(imagesByReleaseName?.Any() ?? false )
-            {
-                foundImageFileName = imagesByReleaseName.First();
-            }
-            if(foundImageFileName == null )
-            {
-                var allImagesInDirectory = Directory.GetFiles(dir, "*.jpg");
-                if(allImagesInDirectory?.Any() ?? false)
-                {
-                    foundImageFileName = allImagesInDirectory.FirstOrDefault(x => x.ToAlphanumericName().Contains(releaseTitle.ToAlphanumericName()));
-                }
-            }
-            if (foundImageFileName != null)
-            {
-                return (new Image
-                {
-                    Bytes = await File.ReadAllBytesAsync(foundImageFileName)
-                }, 1, 0);
-            }
 
+            try
+            {
+                string foundImageFileName = null;
+                var imagesByReleaseName = Directory.GetFiles(dir, $"{releaseTitle}*.jpg".ToFileNameFriendly());
+                if (imagesByReleaseName?.Any() ?? false)
+                {
+                    foundImageFileName = imagesByReleaseName.First();
+                }
+                if (foundImageFileName == null)
+                {
+                    var allImagesInDirectory = Directory.GetFiles(dir, "*.jpg");
+                    if (allImagesInDirectory?.Any() ?? false)
+                    {
+                        foundImageFileName = allImagesInDirectory.FirstOrDefault(x => x.ToAlphanumericName().Contains(releaseTitle.ToAlphanumericName()));
+                    }
+                }
+                if (foundImageFileName != null)
+                {
+                    return (new Image
+                    {
+                        Bytes = await File.ReadAllBytesAsync(foundImageFileName)
+                    }, 1, 0);
+                }
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Attempting to find Release images", dir);
+            }
             return (null, 0, 0);
         }
 

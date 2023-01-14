@@ -30,7 +30,15 @@ namespace TED.Models.MetaData
 
         public Image? CoverImage { get; set; }
 
+        /// <summary>
+        /// Total Duration of the Release in Milliseconds
+        /// </summary>
         public double? Duration { get; set; }
+
+        /// <summary>
+        /// Total Duration of the Release in Minutes
+        /// </summary>
+        public decimal? DurationMinutes => Duration == null ? null : (new TimeInfo(SafeParser.ToNumber<decimal>(Duration.Value))).Minutes;
 
         public string? Directory { get; set; }
 

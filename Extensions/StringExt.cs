@@ -45,7 +45,7 @@ namespace TED.Extensions
             {
                 return null;
             }
-            return input.Replace("’", "'");
+            return Regex.Replace(input.Replace("’", "'"), @"\s+", " ").Trim();
         }
 
         public static bool ContainsUnicodeCharacter(this string input)
