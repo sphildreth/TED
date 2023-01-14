@@ -12,7 +12,7 @@ namespace TED.Processors
 {
     public sealed class DirectoryProcessor
     {
-        private static readonly Regex _hasFeatureFragmentsRegex = new(@"(\sft[\s\.]|\sfeat[\s\.]|featuring)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex _hasFeatureFragmentsRegex = new(@"(\sft[\s\.]|\s*feat[\s\.]|featuring)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -577,10 +577,6 @@ namespace TED.Processors
             {
                 return true;
             }
-            if (releaseTitle.ContainsUnicodeCharacter())
-            {
-                return true;
-            }
             return false;
         }
 
@@ -590,11 +586,11 @@ namespace TED.Processors
             {
                 return true;
             }
-            if (_unwantedTrackTitleTextRegex.IsMatch(trackTitle))
+            if(StringHasFeaturingFragments(trackTitle))
             {
                 return true;
             }
-            if (trackTitle.ContainsUnicodeCharacter())
+            if (_unwantedTrackTitleTextRegex.IsMatch(trackTitle))
             {
                 return true;
             }

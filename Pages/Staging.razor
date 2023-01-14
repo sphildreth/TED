@@ -35,10 +35,10 @@
     <MudSpacer />
     @if (_releases.Any(x => x.Status != Enums.Statuses.Ok))
     {
-        <MudBadge Size="Size.Medium" Content="@_releases.Count(x => x.Status == Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
+        <MudBadge Max="1000" Size="Size.Medium" Content="@_releases.Count(x => x.Status == Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
             <MudIcon Icon="@Icons.Material.Outlined.Folder" Color="Color.Success" />
         </MudBadge>
-        <MudBadge Size="Size.Medium" Content="@_releases.Count(x => x.Status != Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
+        <MudBadge Max="1000" Size="Size.Medium" Content="@_releases.Count(x => x.Status != Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
             <MudIcon Icon="@Icons.Material.Outlined.Folder" Color="Color.Warning" />
         </MudBadge>
     }
@@ -224,6 +224,7 @@
             DirectoryProcessor.MoveFolder(selectedRelease.Directory, Path.Combine(inboundDirectory, new DirectoryInfo(selectedRelease.Directory).Name));
             _processingDirectoryProgress++;
             await InvokeAsync(StateHasChanged);
+            logger.LogInformation("Moved [{ dir }] to inbound [{ inbound }]", selectedRelease.Directory, inboundDirectory);
         });
         _processingDirectoryProgress = 0;
         StateHasChanged();

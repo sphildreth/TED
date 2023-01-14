@@ -38,7 +38,7 @@ namespace TED.Models.MetaData
         /// <summary>
         /// Total Duration of the Release in Minutes
         /// </summary>
-        public decimal? DurationMinutes => Duration == null ? null : (new TimeInfo(SafeParser.ToNumber<decimal>(Duration.Value))).Minutes;
+        public double? DurationMinutes => Duration == null ? null : TimeSpan.FromMilliseconds(Duration.Value).TotalMinutes;
 
         public string? Directory { get; set; }
 
