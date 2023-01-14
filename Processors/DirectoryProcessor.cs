@@ -1,4 +1,5 @@
-﻿using FFMpegCore;
+﻿using ATL.AudioData.IO;
+using FFMpegCore;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -271,6 +272,14 @@ namespace TED.Processors
                                 releaseData.ProcessingMessages.AddRange(releaseStatusCheckData.Item2);
                             }
                         }
+                        if(releaseData.Status == Statuses.Ok)
+                        {
+                            if((releaseData.Year ?? 0) <= DateTime.MinValue.Year)
+                            {
+                                releaseData.Status = Statuses.NeedsAttention;
+                                releaseData.ProcessingMessages.Add(new ProcessMessage($"Release Year [{ releaseData.Year ?? 0 }] is invalid", false, ProcessMessage.BadCheckMark));
+                            }
+                        }
                         var roadieDataFileName = Path.Combine(dir, $"ted.data.json");
                         System.IO.File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(releaseData));
 
@@ -311,12 +320,7 @@ namespace TED.Processors
                                 releaseData.TrackCount > 0,
                                 releaseData.TrackCount > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
                             ));
-                        releaseData.ProcessingMessages.Add(new ProcessMessage
-                            (
-                                "Year is acceptable",
-                                releaseData.Year > 0,
-                                releaseData.Year > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
-                            ));
+
                         if (releaseData.ArtistThumbnail != null)
                         {
                             await File.WriteAllBytesAsync(Path.Combine(releaseData.Directory, "artist.jpg"), releaseData.ArtistThumbnail.Bytes);
