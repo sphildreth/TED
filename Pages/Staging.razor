@@ -218,9 +218,9 @@
             var directorysToProcess = Directory.EnumerateDirectories(directoryToScan);
             _directorysFound = directorysToProcess.Count();
             var sw = new System.Diagnostics.Stopwatch();
+            sw.Start();
             foreach (var dir in directorysToProcess)
             {
-                sw.Start();
                 StagingRelease? releaseForDirectory = null;
                 var filesInDirectory = Directory.GetFiles(dir);
                 if (filesInDirectory.Any())
@@ -255,6 +255,7 @@
                 }
                 _processingDirectoryProgress++;
                 StateHasChanged();
+                sw.Restart();
             }
             _scanning = false;
             _processingDirectoryProgress = 0;

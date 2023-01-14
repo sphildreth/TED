@@ -1,6 +1,7 @@
 ﻿@page "/editrelease/{releaseDirectory}"
 
 @using TED.Enums;
+@using TED.Extensions;
 @using TED.Models.MetaData;
 @using TED.Processors;
 @using System.Text.RegularExpressions
@@ -16,6 +17,13 @@
     <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Numbers" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await RenumberTracks())">Renumber Tracks</MudButton>
     <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.CalendarMonth" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await SetYearToCurrent())">Set Year To Current</MudButton>
     <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Person" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await PromoteTrackArtist())">Promote Track Artist</MudButton>
+    <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Remove" Color="Color.Info" Size="Size.Medium" Label="Trim Track Titles">
+        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(1))">1</MudMenuItem>
+        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(2))">2</MudMenuItem>
+        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(3))">3</MudMenuItem>
+        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(4))">4</MudMenuItem>
+        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(5))">5</MudMenuItem>
+    </MudMenu>
 </MudToolBar>
 
 <div Class="d-flex flex-wrap">
@@ -209,6 +217,17 @@
             }            
         }
         _release.TrackCount = looper;
+    }
+
+    private async Task TrimTrackTitles(int stringLengthToTrim)
+    {
+        foreach (var media in _release.Media)
+        {
+            foreach (var track in media.Tracks.Where(x => x.Title.Nullify() != null))
+            {
+                track.Title = track.Title.Substring(stringLengthToTrim, track.Title.Length - stringLengthToTrim);
+            }
+        }
     }
 
     private async Task PromoteTrackArtist()
