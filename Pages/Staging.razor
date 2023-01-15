@@ -72,6 +72,7 @@
                     <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
                         <MudIconButton OnClick="@((e) => OpenReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" />
                         <MudIconButton OnClick="@((e) => DeleteReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
+                        <MudIconButton OnClick="@((e) => DeleteAllImagesInDirectory(release.Directory))" Icon="@Icons.Material.Filled.HideImage" Color="Color.Warning" />
                         <MudIconButton OnClick="@((e) => EditRelease(release))" Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
                         <MudToggleIconButton @bind-Toggled="@release.Selected"
                                      Icon="@Icons.Material.Filled.CheckBoxOutlineBlank" Color="@Color.Default"
@@ -144,6 +145,39 @@
         System.Diagnostics.Process.Start("explorer.exe", dir);
     }
 
+    async Task DeleteAllImagesInDirectory(string dir)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", "Continue to delete all images in directory? This process cannot be undone.");
+        parameters.Add("ButtonText", "Delete");
+        parameters.Add("Color", Color.Error);
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<Dialog>("Delete Images in Directory", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            foreach (string imageFile in Directory.GetFiles(dir, "*.jpg", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    File.SetAttributes(imageFile, FileAttributes.Normal);
+                    File.Delete(imageFile);
+                }
+                catch { }
+            }
+            var directoryProcessor = new DirectoryProcessor(directoryProcessorlogger);
+            var refreshedRelease = (await directoryProcessor.ProcessAsync(DateTime.UtcNow, dir, Directory.GetFiles(dir))).Adapt<StagingRelease>();
+            refreshedRelease.Selected = refreshedRelease.IsValid;
+            _releases.Remove(_releases.First(x => x.Directory == dir));
+            _releases.Add(refreshedRelease);
+            if (_allReleases.Any(x => x.Directory == dir))
+            {
+                _allReleases.Remove(_allReleases.First(x => x.Directory == dir));
+                _allReleases.Add(refreshedRelease);
+            }
+        }
+    }
+
     async Task DeleteReleaseDirectory(string dir)
     {
         var parameters = new DialogParameters();
@@ -157,6 +191,10 @@
         {
             Directory.Delete(dir, true);
             _releases.Remove(_releases.First(x => x.Directory == dir));
+            if (_allReleases.Any(x => x.Directory == dir))
+            {
+                _allReleases.Remove(_allReleases.First(x => x.Directory == dir));
+            }
         }
     }
 

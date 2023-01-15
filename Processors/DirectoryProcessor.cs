@@ -1,4 +1,5 @@
 ﻿using FFMpegCore;
+using FFMpegCore.Builders.MetaData;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -12,7 +13,9 @@ namespace TED.Processors
 {
     public sealed class DirectoryProcessor
     {
-        private static readonly Regex _hasFeatureFragmentsRegex = new(@"(\sft[\s\.]|\s*feat[\s\.]|featuring)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+		public const int MaximumDiscNumber = 500;
+
+		private static readonly Regex _hasFeatureFragmentsRegex = new(@"(\sft[\s\.]|\s*feat[\s\.]|featuring)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -52,8 +55,11 @@ namespace TED.Processors
             {
                 foreach (var subDir in Directory.GetDirectories(dir, "*.*", SearchOption.AllDirectories))
                 {
-                    ProcessSubDirectory(dir, new DirectoryInfo(subDir));
-                }
+                    if (ProcessSubDirectory(dir, new DirectoryInfo(subDir)))
+                    {
+                        filesInDirectory = Directory.GetFiles(dir);
+                    }
+				}
 
                 foreach (var file in filesInDirectory)
                 {
@@ -386,8 +392,35 @@ namespace TED.Processors
             }
         }
 
-        private void ProcessSubDirectory(string releaseDirectory, DirectoryInfo subDirectory)
+        private bool ProcessSubDirectory(string releaseDirectory, DirectoryInfo subDirectory)
         {
+            var processingFoundNewFiles = false;
+            if(IsDirectoryMediaDirectory(subDirectory.FullName))
+            {
+				var subDirectoryFiles = subDirectory.GetFiles("*.*", SearchOption.TopDirectoryOnly);
+				if (subDirectoryFiles.Any())
+				{
+                    Parallel.ForEach(subDirectoryFiles, subDirectoryFile =>
+                    {
+                        var fileAtl = new ATL.Track(subDirectoryFile.FullName);
+                        if (fileAtl.AudioFormat.ID > -1 && fileAtl.Duration > 0)
+                        {
+							try
+							{
+                                var mediaNumber = fileAtl.DiscNumber ?? DetermineMediaNumberFromDirectory(subDirectory.Name);
+								File.SetAttributes(subDirectoryFile.FullName, FileAttributes.Normal);
+                                var newMediaFileName = Path.Combine(releaseDirectory, $"m{mediaNumber.ToStringPadLeft(3)} {subDirectoryFile.Name}");
+                                subDirectoryFile.MoveTo(newMediaFileName);
+							}
+							catch (Exception ex)
+							{
+								_logger.LogError("Error Moving Media File [{subDirectoryFile}]: [{error}]", subDirectoryFile.FullName, ex.Message);
+							}
+						}
+                    });
+                    processingFoundNewFiles = true;
+				}
+			}
             var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
             coverImages.AddRange((ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.ReleaseSecondary) ?? Enumerable.Empty<FileInfo>()));
             if (coverImages?.Any() ?? false)
@@ -404,7 +437,9 @@ namespace TED.Processors
                         _logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
                     }
                 });
-            }
+				processingFoundNewFiles = true;
+			}
+            return processingFoundNewFiles;
         }
 
         private static bool AllTracksForHaveSameArtist(string albumArtist, IEnumerable<ATL.Track> atlTracksForRelease)
@@ -670,6 +705,32 @@ namespace TED.Processors
         }
 
         public static bool IsDirectoryEmpty(string path) => !Directory.EnumerateFileSystemEntries(path).Any();
+
+        public static int? DetermineMediaNumberFromDirectory(string dir)
+        {
+			if (dir.Nullify() == null)
+			{
+				return null;
+			}
+			for (var i = MaximumDiscNumber; i > 0; i--)
+            {
+				if (Regex.IsMatch(dir, @"(cd\s*(0*" + i + "))", RegexOptions.IgnoreCase))
+				{
+					return i;
+				}
+			}
+			return 1;
+		}
+
+
+		public static bool IsDirectoryMediaDirectory(string dir)
+        {
+            if(dir.Nullify() == null)
+            {
+                return false;
+            }
+            return Regex.IsMatch(dir, $"(\\s*CD[0-9]+)", RegexOptions.IgnoreCase);
+        }
 
         public static void DeleteDirectory(string target_dir)
         {

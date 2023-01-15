@@ -236,7 +236,7 @@
         {
             return null;
         }
-        return Regex.Replace(trackArtist, $"\\s*(&|ft(\\.)*|feat)\\s*|\\s+x\\s+",  "/", RegexOptions.IgnoreCase).Trim();
+        return Regex.Replace(trackArtist, $"\\s*(&|ft(\\.)*|feat)\\s*|\\s+x\\s+|\\s*\\,\\s*",  "/", RegexOptions.IgnoreCase).Trim();
     }
 
     public static string? RemoveArtistFromTrackArtist(string? artist, string? trackArtist)
