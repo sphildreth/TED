@@ -625,18 +625,26 @@ namespace TED.Processors
             {
                 return true;
             }
-            if (_unwantedTrackTitleTextRegex.IsMatch(trackTitle))
+            try
             {
-                return true;
-            }
-            if (trackTitle.Any(char.IsDigit))
-            {
-                if (string.Equals(trackTitle.Trim(), (trackNumber ?? 0).ToString(), StringComparison.OrdinalIgnoreCase))
+                if (_unwantedTrackTitleTextRegex.IsMatch(trackTitle))
                 {
                     return true;
                 }
-                return Regex.IsMatch(trackTitle, $"^({releaseTitle}\\s*.*\\s*)?([0-9]*{trackNumber}\\s)");
+                if (trackTitle.Any(char.IsDigit))
+                {
+                    if (string.Equals(trackTitle.Trim(), (trackNumber ?? 0).ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                    return Regex.IsMatch(trackTitle, $"^({ Regex.Escape(releaseTitle)}\\s*.*\\s*)?([0-9]*{trackNumber}\\s)");
+                }
+
             }
+            catch (Exception ex)
+            {
+                Console.Write($"TrackHasUnwantedText For ReleaseTitle [{releaseTitle}] for TrackTitle [{trackTitle}] Error [{ ex.Message }] ", "Error");
+            }            
             return false;
         }
 
