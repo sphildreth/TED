@@ -729,12 +729,10 @@ namespace TED.Processors
                 return (trackTitle, null);
             }
             var newTitle = trackTitle;
-            var featureArtist = string.Empty;
-
             var matches = _hasFeatureFragmentsRegex.Match(trackTitle);
             newTitle = newTitle.Substring(0, matches.Index).CleanString();
-            featureArtist = ReplaceTrackArtistSeperators(_hasFeatureFragmentsRegex.Replace(trackTitle.Substring(matches.Index), string.Empty).CleanString());
-            featureArtist = featureArtist.TrimEnd(']', ')');
+            string? featureArtist = ReplaceTrackArtistSeperators(_hasFeatureFragmentsRegex.Replace(trackTitle.Substring(matches.Index), string.Empty).CleanString());
+            featureArtist = featureArtist.TrimEnd(']', ')').Replace("\"", "'");
             return (newTitle, featureArtist);
         }
 
