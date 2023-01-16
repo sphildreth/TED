@@ -225,19 +225,12 @@
         {
             foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
             {
-                track.TrackArtist.ArtistData.Text = ReplaceTrackArtistSeperators(track.TrackArtist.ArtistData.Text);
+                track.TrackArtist.ArtistData.Text = DirectoryProcessor.ReplaceTrackArtistSeperators(track.TrackArtist.ArtistData.Text);
             }
         }
     }
 
-    public static string ReplaceTrackArtistSeperators(string? trackArtist)
-    {
-        if (trackArtist.Nullify() == null)
-        {
-            return null;
-        }
-        return Regex.Replace(trackArtist, $"\\s*(&|ft(\\.)*|feat)\\s*|\\s+x\\s+|\\s*\\,\\s*",  "/", RegexOptions.IgnoreCase).Trim();
-    }
+
 
     public static string? RemoveArtistFromTrackArtist(string? artist, string? trackArtist)
     {

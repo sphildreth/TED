@@ -15,7 +15,7 @@ namespace TED.Processors
     {
 		public const int MaximumDiscNumber = 500;
 
-		private static readonly Regex _hasFeatureFragmentsRegex = new(@"(\sft[\s\.]|\s*feat[\s\.]|featuring)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+		private static readonly Regex _hasFeatureFragmentsRegex = new(@"(\s[\(\[]*ft[\s\.]|\s*[\(\[]*feat[\s\.]|[\(\[]*featuring)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _unwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -705,6 +705,38 @@ namespace TED.Processors
         }
 
         public static bool IsDirectoryEmpty(string path) => !Directory.EnumerateFileSystemEntries(path).Any();
+
+        public static string ReplaceTrackArtistSeperators(string? trackArtist)
+        {
+            if (trackArtist.Nullify() == null)
+            {
+                return null;
+            }
+            return Regex.Replace(trackArtist, $"\\s*(&|ft(\\.)*|feat)\\s*|\\s+x\\s+|\\s*\\,\\s*", "/", RegexOptions.IgnoreCase).Trim();
+        }
+
+        /// <summary>
+        /// Returns the given TrackTitle with the Feature first and the Featuring second
+        /// </summary>
+        public static (string?, string?) RemoveFeaturingArtistFromTrackTitle(string trackTitle)
+        {
+            if (trackTitle.Nullify() == null)
+            {
+                return (null, null);
+            }
+            if(!StringHasFeaturingFragments(trackTitle))
+            {
+                return (trackTitle, null);
+            }
+            var newTitle = trackTitle;
+            var featureArtist = string.Empty;
+
+            var matches = _hasFeatureFragmentsRegex.Match(trackTitle);
+            newTitle = newTitle.Substring(0, matches.Index).CleanString();
+            featureArtist = ReplaceTrackArtistSeperators(_hasFeatureFragmentsRegex.Replace(trackTitle.Substring(matches.Index), string.Empty).CleanString());
+            featureArtist = featureArtist.TrimEnd(']', ')');
+            return (newTitle, featureArtist);
+        }
 
         public static int? DetermineMediaNumberFromDirectory(string dir)
         {
