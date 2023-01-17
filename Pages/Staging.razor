@@ -30,8 +30,13 @@
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status == Enums.Statuses.Ok, true))">Ready to Move</MudMenuItem>
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.DurationMinutes <= 10, true))">Under 10 Minutes</MudMenuItem>
     </MudMenu>
+    <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SelectAll" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Select">
+        <MudMenuItem OnClick="@( (e) => ToggleSelected(true))">Select All</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => ToggleSelected(false))">Select None</MudMenuItem>
+    </MudMenu>
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Warning" Size="Size.Medium" OnClick="@((e) => DeleteChecked())">Delete</MudButton>
+    <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AutoAwesome" Color="Color.Secondary" Size="Size.Medium" OnClick="@((e) => DoMagic())">Do Magic</MudButton>
     <MudSpacer />
     @if (_releases.Any(x => x.Status != Enums.Statuses.Ok))
     {
@@ -163,7 +168,11 @@
                     File.SetAttributes(imageFile, FileAttributes.Normal);
                     File.Delete(imageFile);
                 }
-                catch { }
+                catch(Exception ex)             
+                {
+                    logger.LogError(ex, "Error Deleting Images in directory [{ dir }]", dir);
+
+                }
             }
             var directoryProcessor = new DirectoryProcessor(directoryProcessorlogger);
             var refreshedRelease = (await directoryProcessor.ProcessAsync(DateTime.UtcNow, dir, Directory.GetFiles(dir))).Adapt<StagingRelease>();
@@ -203,12 +212,65 @@
         UriHelper.NavigateTo($"/editrelease/{ System.Net.WebUtility.UrlEncode(release.Directory) }");
     }
 
+    void ToggleSelected(bool selected)
+    {
+        foreach (var r in _releases)
+        {
+            r.Selected = selected;
+        }
+    }
+
     void FilterReleases(Func<StagingRelease, bool> filter, bool select)
     {
         _releases = _allReleases.Where(filter).ToList();
         foreach (var r in _releases)
         {
             r.Selected = select;
+        }
+    }
+
+    async Task DoMagic()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", "Continue to adjust Releases magically? This process cannot be undone.");
+        parameters.Add("ButtonText", "Do Magic");
+        parameters.Add("Color", Color.Error);
+        var releaseSaveProcessor = new ReleaseSaveProcessor(releaseProcessorLogger);
+        var editRelease = new EditRelease();
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<Dialog>("Adjust Release MetaData", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            var now = DateTime.UtcNow;
+            _movingFolders = true;
+            var selectedReleases = _releases.Where(x => x.Selected).ToArray();
+            _directorysFound = selectedReleases.Count();
+            _processingDirectoryProgress = 0;
+            await Parallel.ForEachAsync(selectedReleases, async (selectedRelease, cancellationToken) =>
+            {
+                try
+                {
+                    await releaseSaveProcessor.ProcessAsync(now, await editRelease.DoMagic(selectedRelease));
+
+                    _releases.Remove(_releases.First(x => x.Directory == selectedRelease.Directory));
+                    if (_allReleases.Any(x => x.Directory == selectedRelease.Directory))
+                    {
+                        _allReleases.Remove(_allReleases.First(x => x.Directory == selectedRelease.Directory));
+                    }
+                    _processingDirectoryProgress++;
+                    await InvokeAsync(StateHasChanged);
+                    logger.LogInformation("Performed Magic on Release directory [{ release }]", selectedRelease);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error Doing magic on Release [{ release }]", selectedRelease.ToString());
+                }
+            });
+            _processingDirectoryProgress = 0;
+            StateHasChanged();
+            _movingFolders = false;
+            await DoScan();
         }
     }
 
@@ -236,9 +298,12 @@
                     _allReleases.Remove(_releases.First(x => x.Directory == selectedRelease.Directory));
                     _processingDirectoryProgress++;
                     await InvokeAsync(StateHasChanged);
+                    logger.LogInformation("Deleted Release directory [{ dir }]", selectedRelease.Directory);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    logger.LogError(ex, "Error Deleting Release directory [{ dir }]", selectedRelease.Directory);
+
                 }
             });
             _processingDirectoryProgress = 0;
@@ -258,11 +323,20 @@
         var saveProcessor = new ReleaseSaveProcessor(releaseProcessorLogger);
         await Parallel.ForEachAsync(selectedReleases, async (selectedRelease, cancellationToken) =>
         {
-            await saveProcessor.ProcessAsync(now, selectedRelease);
-            DirectoryProcessor.MoveFolder(selectedRelease.Directory, Path.Combine(inboundDirectory, new DirectoryInfo(selectedRelease.Directory).Name));
-            _processingDirectoryProgress++;
-            await InvokeAsync(StateHasChanged);
-            logger.LogInformation("Moved [{ dir }] to inbound [{ inbound }]", selectedRelease.Directory, inboundDirectory);
+            try
+            {
+                    await saveProcessor.ProcessAsync(now, selectedRelease);
+                    DirectoryProcessor.MoveFolder(selectedRelease.Directory, Path.Combine(inboundDirectory, new DirectoryInfo(selectedRelease.Directory).Name));
+                    _processingDirectoryProgress++;
+                    await InvokeAsync(StateHasChanged);
+                    logger.LogInformation("Moved [{ dir }] to inbound [{ inbound }]", selectedRelease.Directory, inboundDirectory);
+
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error Moving Release directory [{ dir }]", selectedRelease.Directory);
+
+            }
         });
         _processingDirectoryProgress = 0;
         StateHasChanged();

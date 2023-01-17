@@ -148,16 +148,16 @@
 </MudGrid>
 
 @code {
-        [Inject]
-        ISnackbar Snackbar { get; set; }
-        bool success;
-        string[] errors = { };
-        MudForm form;
-        ReleaseFluentValidator releaseValidator = new ReleaseFluentValidator();
-        string[] messageHeadings = { "Type", "Details" };
-        bool _submitted = false;
+    [Inject]
+    ISnackbar Snackbar { get; set; }
+    bool success;
+    string[] errors = { };
+    MudForm form;
+    ReleaseFluentValidator releaseValidator = new ReleaseFluentValidator();
+    string[] messageHeadings = { "Type", "Details" };
+    bool _submitted = false;
 
-        Release _release = new Release
+    Release _release = new Release
         {
             Artist = new Models.DataToken(),
             ReleaseData = new Models.DataToken(),
@@ -179,75 +179,117 @@
             }
         };
 
-        //    OrderDetailsModelFluentValidator orderDetailsValidator = new OrderDetailsModelFluentValidator();
+    //    OrderDetailsModelFluentValidator orderDetailsValidator = new OrderDetailsModelFluentValidator();
 
-        private async Task DeleteRelease()
+    private async Task DeleteRelease()
+    {
+        Directory.Delete(_release.Directory, true);
+        Snackbar.Add("Deleted!");
+        NavigationManager.NavigateTo("/staging");
+    }
+
+    private async Task DeleteReleaseImages()
+    {
+        _release.CoverImage = null;
+        var releaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(_release.Directory), ImageType.Release, SearchOption.TopDirectoryOnly);
+        if (releaseImagesInDirectory?.Any() ?? false)
         {
-            Directory.Delete(_release.Directory, true);
-            Snackbar.Add("Deleted!");
-            NavigationManager.NavigateTo("/staging");
+            Parallel.ForEach(releaseImagesInDirectory, releaseImageInDirectory =>
+            {
+                releaseImageInDirectory.Delete();
+            });
         }
-
-        private async Task DeleteReleaseImages()
+        var secondaryReleaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(_release.Directory), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
+        if (secondaryReleaseImagesInDirectory?.Any() ?? false)
         {
-            _release.CoverImage = null;
-            var releaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(_release.Directory), ImageType.Release, SearchOption.TopDirectoryOnly);
-            if (releaseImagesInDirectory?.Any() ?? false)
+            Parallel.ForEach(secondaryReleaseImagesInDirectory, secondaryReleaseImageInDirectory =>
             {
-                Parallel.ForEach(releaseImagesInDirectory, releaseImageInDirectory =>
-                {
-                    releaseImageInDirectory.Delete();
-                });
-            }
-            var secondaryReleaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(_release.Directory), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
-            if (secondaryReleaseImagesInDirectory?.Any() ?? false)
+                secondaryReleaseImageInDirectory.Delete();
+            });
+        }
+    }
+
+    private async Task RemoveArtistFromTrackArtists()
+    {
+        foreach (var media in _release.Media)
+        {
+            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
             {
-                Parallel.ForEach(secondaryReleaseImagesInDirectory, secondaryReleaseImageInDirectory =>
-                {
-                    secondaryReleaseImageInDirectory.Delete();
-                });
+                track.TrackArtist.ArtistData.Text = RemoveArtistFromTrackArtist(_release.Artist?.Text, track.TrackArtist.ArtistData.Text);
             }
         }
+    }
 
-        private async Task RemoveArtistFromTrackArtists()
+    private async Task ReplaceTracksArtistSeperators()
+    {
+        foreach (var media in _release.Media)
         {
-            foreach (var media in _release.Media)
+            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
             {
-                foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
+                track.TrackArtist.ArtistData.Text = DirectoryProcessor.ReplaceTrackArtistSeperators(track.TrackArtist.ArtistData.Text);
+            }
+        }
+    }
+
+    private async Task RemoveFeaturingArtistFromTracksArtist()
+    {
+        foreach (var media in _release.Media)
+        {
+            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
+            {
+                var trackArtistFeatureArtist = DirectoryProcessor.RemoveFeaturingArtistFromTrackTitle(track.TrackArtist?.ArtistData.Text);
+                if(trackArtistFeatureArtist.Item1 != null && trackArtistFeatureArtist.Item2 == null)
                 {
-                    track.TrackArtist.ArtistData.Text = RemoveArtistFromTrackArtist(_release.Artist?.Text, track.TrackArtist.ArtistData.Text);
+                    track.TrackArtist.ArtistData.Text = trackArtistFeatureArtist.Item1;
+                }
+                else if(trackArtistFeatureArtist.Item1 != null && trackArtistFeatureArtist.Item2 != null &&
+                    !StringExt.DoStringsMatch(_release?.Artist?.Text, trackArtistFeatureArtist.Item1) && 
+                    !StringExt.DoStringsMatch(_release?.Artist?.Text, trackArtistFeatureArtist.Item2))
+                {
+                    track.TrackArtist.ArtistData.Text = $"{trackArtistFeatureArtist.Item1}/{trackArtistFeatureArtist.Item2}";
                 }
             }
         }
+    }
 
-        private async Task ReplaceTracksArtistSeperators()
+    private async Task RemoveFeaturingArtistFromTrackTitle()
+    {
+        foreach (var media in _release.Media)
         {
-            foreach (var media in _release.Media)
+            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
             {
-                foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
+                var trackFeatureArtist = DirectoryProcessor.RemoveFeaturingArtistFromTrackTitle(track.Title);
+                track.Title = trackFeatureArtist.Item1 ?? track.Title;
+                if (trackFeatureArtist.Item2 != null && !StringExt.DoStringsMatch(_release?.Artist?.Text, trackFeatureArtist.Item2))
                 {
-                    track.TrackArtist.ArtistData.Text = DirectoryProcessor.ReplaceTrackArtistSeperators(track.TrackArtist.ArtistData.Text);
-                }
-            }
-        }
-
-        private async Task RemoveFeaturingArtistFromTrackTitle()
-        {
-            foreach (var media in _release.Media)
-            {
-                foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
-                {
-                    var trackFeatureArtist = DirectoryProcessor.RemoveFeaturingArtistFromTrackTitle(track.Title);
-                    track.Title = trackFeatureArtist.Item1 ?? track.Title;
-                    if (!StringExt.DoStringsMatch(_release?.Artist?.Text, trackFeatureArtist.Item2))
+                    if (track.TrackArtist.ArtistData.Text.Nullify() != null)
+                    {
+                        track.TrackArtist.ArtistData.Text = $"{track.TrackArtist.ArtistData.Text}/{trackFeatureArtist.Item2}";
+                    }
+                    else
                     {
                         track.TrackArtist.ArtistData.Text = trackFeatureArtist.Item2;
                     }
                 }
+            }
         }
     }
 
-
+    public async Task<Release> DoMagic(Release release)
+    {
+        ReleaseDirectory = release.Directory;
+        _release = release;
+        _release.ReleaseDateDateTime = DateTime.Parse(_release.ReleaseDate ?? DateTime.MinValue.ToString());
+        await RenumberTracks();
+        await RemoveFeaturingArtistFromTracksArtist();
+        await RemoveFeaturingArtistFromTrackTitle();
+        await ReplaceTracksArtistSeperators();
+        if(_release.Year == null)
+        {
+            await SetYearToCurrent();
+        }
+        return _release;
+    }
 
     public static string? RemoveArtistFromTrackArtist(string? artist, string? trackArtist)
     {
@@ -308,7 +350,7 @@
         _release.ReleaseDateDateTime = DateTime.UtcNow;
     }
 
-    private async Task Submit()
+    public async Task Submit()
     {
         await form.Validate();
 

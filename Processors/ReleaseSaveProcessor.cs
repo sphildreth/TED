@@ -36,12 +36,19 @@ namespace TED.Processors
                     if (fileAtl != null)
                     {
                         var trackForFile = release.Media.SelectMany(x => x.Tracks).FirstOrDefault(x => string.Equals(x.FileName, fullPathToFile, StringComparison.OrdinalIgnoreCase));
-                        fileAtl.AlbumArtist = releaseArtist;
+                        if (trackForFile == null)
+                        {
+                            throw new Exception($"Unable to find Track for Filename [{fullPathToFile}]");
+                        }
+                        var mediaForFile = release.Media.Where(x => x.Tracks.Any(x => x.Id == trackForFile.Id)).FirstOrDefault();
                         fileAtl.Album = release.ReleaseData?.Text ?? throw new Exception("Invalid Release Title");
+                        fileAtl.AlbumArtist = releaseArtist;
                         fileAtl.Comment = string.Empty;
+                        fileAtl.DiscNumber = mediaForFile.MediaNumber;
+                        fileAtl.DiscTotal = release.Media.Max(x => x.MediaNumber);
+                        fileAtl.Title = trackForFile.Title;
                         fileAtl.TrackNumber = trackForFile.TrackNumber;
                         fileAtl.TrackTotal = release.Media.FirstOrDefault(x => x.TrackById(trackForFile.Id) != null)?.TrackCount;
-                        fileAtl.Title = trackForFile.Title;
                         fileAtl.Year = release.ReleaseDateDateTime?.Year ?? throw new Exception("Invalid Release year");
                         var trackArtist = trackForFile.TrackArtist?.ArtistData?.Text.Nullify();
                         if (trackArtist != null && !StringExt.DoStringsMatch(releaseArtist, trackArtist))
