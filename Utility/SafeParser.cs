@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using TED.Extensions;
 
 namespace TED.Utility
 {
@@ -168,8 +169,12 @@ namespace TED.Utility
             return t == null ? default(T) : (T)Convert.ChangeType(value, t);
         }
 
-        public static string ToToken(string input)
+        public static string? ToToken(string input)
         {
+            if(input.Nullify() == null)
+            {
+                return null;
+            }
             var hashids = new Hashids(Salt);
             var numbers = 0;
             var bytes = System.Text.Encoding.ASCII.GetBytes(input);

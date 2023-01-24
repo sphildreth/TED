@@ -1,6 +1,8 @@
-﻿using System.Text.RegularExpressions;
+﻿using ATL.AudioData.IO;
+using System.Text.RegularExpressions;
 using TED.Extensions;
 using TED.Models.MetaData;
+using TED.Utility;
 
 namespace TED.Processors
 {
@@ -20,7 +22,7 @@ namespace TED.Processors
             throw new NotImplementedException();
         }
 
-        public async Task<Release> DoMagic(Release release)
+        public Task<Release> DoMagic(Release release)
         {
             release.ReleaseDateDateTime = DateTime.Parse(release.ReleaseDate ?? DateTime.MinValue.ToString());
             RenumberTracks(release);
@@ -31,7 +33,13 @@ namespace TED.Processors
             {
                 SetYearToCurrent(release);
             }
-            return release;
+            var modifiedTitle = RemoveUnwantedTextFromReleaseTitle(release.ReleaseData?.Text);
+            release.ReleaseData = new Models.DataToken
+            {
+                Text = modifiedTitle,
+                Value = SafeParser.ToToken(modifiedTitle)
+            };
+            return Task.FromResult(release);
         }
 
         public static string? RemoveArtistFromTrackArtist(string? artist, string? trackArtist)
@@ -47,37 +55,56 @@ namespace TED.Processors
             return Regex.Replace(trackArtist, $"\\s*({artist})\\s*(&|and|with)*", string.Empty).Trim();
         }
 
+        public static string? RemoveUnwantedTextFromReleaseTitle(string? title)
+        {
+            if (title.Nullify() == null)
+            {
+                return null;
+            }
+            return DirectoryProcessor.UnwantedReleaseTitleTextRegex.Replace(title, string.Empty).Trim();
+        }
+
         public void RenumberTracks(Release release)
         {
             var looper = 1;
-            foreach (var media in release.Media)
+            var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();
+            foreach (var media in medias)
             {
+                var tracks = (media.Tracks ?? Enumerable.Empty<Track>()).OrderBy(x => x.TrackNumber).ToList();
                 looper = 1;
-                foreach (var track in media.Tracks)
+                foreach (var track in tracks)
                 {
                     track.TrackNumber = looper;
                     looper++;
                 }
+                media.Tracks = tracks;
             }
             release.TrackCount = looper;
+            release.Media = medias;
         }
 
         public void TrimTrackTitles(int stringLengthToTrim, Release release)
         {
-            foreach (var media in release.Media)
+            var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();
+            foreach (var media in medias)
             {
-                foreach (var track in media.Tracks.Where(x => x.Title.Nullify() != null))
+                var tracks = (media.Tracks ?? Enumerable.Empty<Track>()).OrderBy(x => x.TrackNumber).ToList();
+                foreach (var track in tracks.Where(x => x.Title.Nullify() != null))
                 {
                     track.Title = track.Title.Substring(stringLengthToTrim, track.Title.Length - stringLengthToTrim);
                 }
+                media.Tracks = tracks;
             }
+            release.Media = medias;
         }
 
         public void RemoveFeaturingArtistFromTrackTitle(Release release)
         {
-            foreach (var media in release.Media)
+            var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();
+            foreach (var media in medias)
             {
-                foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
+                var tracks = (media.Tracks ?? Enumerable.Empty<Track>()).OrderBy(x => x.TrackNumber).ToList();
+                foreach (var track in tracks)
                 {
                     var trackFeatureArtist = DirectoryProcessor.RemoveFeaturingArtistFromTrackTitle(track.Title);
                     track.Title = trackFeatureArtist.Item1 ?? track.Title;
@@ -85,30 +112,46 @@ namespace TED.Processors
                     {
                         if (track.TrackArtist.ArtistData.Text.Nullify() != null)
                         {
-                            track.TrackArtist.ArtistData.Text = $"{track.TrackArtist.ArtistData.Text}/{trackFeatureArtist.Item2}";
+                            var tt = $"{track.TrackArtist.ArtistData.Text}/{trackFeatureArtist.Item2}";
+                            track.TrackArtist.ArtistData = new Models.DataToken
+                            {
+                                Text = tt,
+                                Value = SafeParser.ToToken(tt)
+                            };
                         }
                         else
                         {
-                            track.TrackArtist.ArtistData.Text = trackFeatureArtist.Item2;
+                            var tt = trackFeatureArtist.Item2;
+                            track.TrackArtist.ArtistData = new Models.DataToken
+                            {
+                                Text = tt,
+                                Value = SafeParser.ToToken(tt)
+                            };
                         }
                     }
                 }
+                media.Tracks = tracks;
             }
+            release.Media = medias;
         }
 
         public async Task PromoteTrackArtist(Release release)
         {
             release.Artist = release.Media.First().Tracks.First().TrackArtist.ArtistData;
-            foreach (var media in release.Media)
+            var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();
+            foreach (var media in medias)
             {
-                foreach (var track in media.Tracks)
+                var tracks = (media.Tracks ?? Enumerable.Empty<Track>()).OrderBy(x => x.TrackNumber).ToList();
+                foreach (var track in tracks.Where(x => x.TrackArtist?.ArtistData != null))
                 {
                     track.TrackArtist = new Artist()
                     {
                         ArtistData = new Models.DataToken()
                     };
                 }
+                media.Tracks = tracks;
             }
+            release.Media = medias;
         }
 
         public void SetYearToCurrent(Release release)
@@ -118,49 +161,82 @@ namespace TED.Processors
 
         public static void RemoveArtistFromTrackArtists(Release release)
         {
-            foreach (var media in release.Media)
+            var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();
+            foreach (var media in medias)
             {
-                foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
+                var tracks = (media.Tracks ?? Enumerable.Empty<Track>()).OrderBy(x => x.TrackNumber).ToList();
+                foreach (var track in tracks.Where(x => x.TrackArtist?.ArtistData != null))
                 {
-                    track.TrackArtist.ArtistData.Text = RemoveArtistFromTrackArtist(release.Artist?.Text, track.TrackArtist.ArtistData.Text);
+                    var tt = RemoveArtistFromTrackArtist(release.Artist?.Text, track.TrackArtist.ArtistData.Text);
+                    track.TrackArtist.ArtistData = new Models.DataToken
+                    {
+                        Text = tt,
+                        Value = SafeParser.ToToken(tt)
+                    };
                 }
+                media.Tracks = tracks;
             }
+            release.Media = medias;
         }
 
         public void ReplaceTracksArtistSeperators(Release release)
         {
-            foreach (var media in release.Media)
+            var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();
+            foreach (var media in medias)
             {
-                foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
+                var tracks = (media.Tracks ?? Enumerable.Empty<Track>()).OrderBy(x => x.TrackNumber).ToList();
+                foreach (var track in tracks.Where(x => x.TrackArtist?.ArtistData != null))
                 {
-                    track.TrackArtist.ArtistData.Text = DirectoryProcessor.ReplaceTrackArtistSeperators(track.TrackArtist.ArtistData.Text);
+                    var tt = DirectoryProcessor.ReplaceTrackArtistSeperators(track.TrackArtist.ArtistData.Text);
+                    track.TrackArtist.ArtistData = new Models.DataToken
+                    {
+                        Text = tt,
+                        Value = SafeParser.ToToken(tt)
+                    };
                 }
+                media.Tracks = tracks;
             }
+            release.Media = medias;
         }
 
         public void RemoveFeaturingArtistFromTracksArtist(Release release)
         {
-            foreach (var media in release.Media)
+            var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();
+            foreach (var media in medias)
             {
-                foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
+                var tracks = (media.Tracks ?? Enumerable.Empty<Track>()).OrderBy(x => x.TrackNumber).ToList();
+                foreach (var track in tracks.Where(x => x.TrackArtist?.ArtistData != null))
                 {
                     var trackArtistFeatureArtist = DirectoryProcessor.RemoveFeaturingArtistFromTrackTitle(track.TrackArtist?.ArtistData.Text);
                     if (trackArtistFeatureArtist.Item1 != null && trackArtistFeatureArtist.Item2 == null &&
                         !StringExt.DoStringsMatch(release?.Artist?.Text, trackArtistFeatureArtist.Item1))
                     {
-                        track.TrackArtist.ArtistData.Text = trackArtistFeatureArtist.Item1;
+                        track.TrackArtist.ArtistData = new Models.DataToken
+                        {
+                            Text = trackArtistFeatureArtist.Item1,
+                            Value = SafeParser.ToToken(trackArtistFeatureArtist.Item1)
+                        };
                     }
                     else if (trackArtistFeatureArtist.Item1 != null && trackArtistFeatureArtist.Item2 != null)
                     {
                         if (!StringExt.DoStringsMatch(release?.Artist?.Text, trackArtistFeatureArtist.Item1) &&
                             !StringExt.DoStringsMatch(release?.Artist?.Text, trackArtistFeatureArtist.Item2))
                         {
-                            track.TrackArtist.ArtistData.Text = $"{trackArtistFeatureArtist.Item1}/{trackArtistFeatureArtist.Item2}";
+                            var tt = $"{trackArtistFeatureArtist.Item1}/{trackArtistFeatureArtist.Item2}";
+                            track.TrackArtist.ArtistData = new Models.DataToken
+                            {
+                                Text = tt,
+                                Value = SafeParser.ToToken(tt)
+                            };
                         }
                         else if (StringExt.DoStringsMatch(release?.Artist?.Text, trackArtistFeatureArtist.Item1) &&
-                                  !StringExt.DoStringsMatch(release?.Artist?.Text, trackArtistFeatureArtist.Item2))
+                                 !StringExt.DoStringsMatch(release?.Artist?.Text, trackArtistFeatureArtist.Item2))
                         {
-                            track.TrackArtist.ArtistData.Text = trackArtistFeatureArtist.Item2;
+                            track.TrackArtist.ArtistData = new Models.DataToken
+                            {
+                                Text = trackArtistFeatureArtist.Item2,
+                                Value = SafeParser.ToToken(trackArtistFeatureArtist.Item2)
+                            };
                         }
                     }
                     else
@@ -171,7 +247,9 @@ namespace TED.Processors
                         };
                     }
                 }
+                media.Tracks = tracks;
             }
+            release.Media = medias;
         }
 
         public static bool IsValidReleaseYear(int? year)

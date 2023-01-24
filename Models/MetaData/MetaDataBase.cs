@@ -10,7 +10,7 @@ namespace TED.Models.MetaData
         public MetaDataBase(IRandomNumber? randomNumber, IClock? clock)
         {
             RandomSortId = randomNumber?.Next() ?? 0;
-            CreatedDate = clock?.GetCurrentInstant().ToDateTimeUtc() ?? DateTime.MinValue;
+            CreatedDate = clock?.GetCurrentInstant().ToDateTimeUtc() ?? DateTime.UtcNow;
             Id = Guid.NewGuid();
         }
 
