@@ -185,8 +185,27 @@
 
                 }
             }
+            var parentDirectory = Directory.GetParent(dir).FullName;
+            var isParentDirectoryInboundFolder = string.Equals(parentDirectory, @Configuration["TED:StagingDirectory"], StringComparison.OrdinalIgnoreCase);
+            if (!isParentDirectoryInboundFolder)
+            {
+                foreach (string imageFile in Directory.GetFiles(parentDirectory, "*.jpg", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        File.SetAttributes(imageFile, FileAttributes.Normal);
+                        File.Delete(imageFile);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Error Deleting Images in directory [{ dir }]", dir);
+
+                    }
+                }
+            }
+
             var directoryProcessor = new DirectoryProcessor(DirectoryProcessorLogger);
-            var refreshedRelease = (await directoryProcessor.ProcessAsync(DateTime.UtcNow, dir, Directory.GetFiles(dir))).Adapt<StagingRelease>();
+            var refreshedRelease = (await directoryProcessor.ProcessAsync(DateTime.UtcNow, dir, Directory.GetFiles(dir), true)).Adapt<StagingRelease>();
             refreshedRelease.Selected = refreshedRelease.IsValid;
             _releases.Remove(_releases.First(x => x.Directory == dir));
             _releases.Add(refreshedRelease);
