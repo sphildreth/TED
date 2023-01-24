@@ -734,7 +734,7 @@ namespace TED.Processors
             {
                 return null;
             }
-            return Regex.Replace(trackArtist, $"\\s*(&|ft(\\.)*|feat)\\s*|\\s+x\\s+|\\s*\\,\\s*", "/", RegexOptions.IgnoreCase).Trim();
+            return Regex.Replace(trackArtist, $"\\s+with\\s+|\\s*;\\s*|\\s*(&|ft(\\.)*|feat)\\s*|\\s+x\\s+|\\s*\\,\\s*", "/", RegexOptions.IgnoreCase).Trim();
         }
 
         /// <summary>

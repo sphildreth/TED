@@ -8,6 +8,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject NavigationManager NavigationManager
 @inject ILoggerFactory LoggerFactory
+@inject IDialogService DialogService
 
 <PageTitle>Editing Release</PageTitle>
 
@@ -19,6 +20,7 @@
         <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Numbers" OnClick="@( (e) => _releaseEditProcessor.RenumberTracks(_release))">Renumber Tracks</MudMenuItem>
         <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => ReleaseEditProcessor.RemoveArtistFromTrackArtists(_release))">Remove Artist From Track Artists</MudMenuItem>
         <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.RemoveFeaturingArtistFromTrackTitle(_release))">Remove Featuring Artists From Track Title</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.EditNote" OnClick="@( async (e) => await RemoveTextFromTrackTitles())">Remove text from Track Titles</MudMenuItem>
         <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.ReplaceTracksArtistSeperators(_release))">Replace Track Artist Seperators</MudMenuItem>
         <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.CalendarMonth" OnClick="@( (e) => _releaseEditProcessor.SetYearToCurrent(_release))">Set Year To Current</MudMenuItem>
     </MudMenu>
@@ -208,6 +210,21 @@
                 secondaryReleaseImageInDirectory.Delete();
             });
         }
+    }
+
+    public async Task RemoveTextFromTrackTitles()
+    {
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true };
+
+        var dialog = await DialogService.ShowAsync<RemoveTextFromTrackTitleDialog>("Enter text to remove", 
+            new DialogParameters { ["TextToRemove"] = _release.Media.First().Tracks.First().Title },
+            closeOnEscapeKey);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            _releaseEditProcessor.RemoveTextFromTracks(_release, result.Data as string);
+        }
+
     }
 
     public async Task Submit()

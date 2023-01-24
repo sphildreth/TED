@@ -1,0 +1,20 @@
+﻿
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="@TextToRemove" T="string" Label="Text"></MudTextField>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Ok</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    [Parameter] public string? TextToRemove { get; set; }
+
+    void Submit() => MudDialog.Close(DialogResult.Ok(TextToRemove));
+    void Cancel() => MudDialog.Cancel();
+}
+

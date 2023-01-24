@@ -207,13 +207,8 @@
             var directoryProcessor = new DirectoryProcessor(DirectoryProcessorLogger);
             var refreshedRelease = (await directoryProcessor.ProcessAsync(DateTime.UtcNow, dir, Directory.GetFiles(dir), true)).Adapt<StagingRelease>();
             refreshedRelease.Selected = refreshedRelease.IsValid;
-            _releases.Remove(_releases.First(x => x.Directory == dir));
+            RemoveReleaseFromLocalVariables(_releases.First(x => x.Directory == dir));
             _releases.Add(refreshedRelease);
-            if (_allReleases.Any(x => x.Directory == dir))
-            {
-                _allReleases.Remove(_allReleases.First(x => x.Directory == dir));
-                _allReleases.Add(refreshedRelease);
-            }
         }
     }
 
@@ -228,13 +223,29 @@
         var result = await dialog.Result;
         if (!result.Canceled)
         {
-            Directory.Delete(dir, true);
-            _releases.Remove(_releases.First(x => x.Directory == dir));
-            if (_allReleases.Any(x => x.Directory == dir))
-            {
-                _allReleases.Remove(_allReleases.First(x => x.Directory == dir));
-            }
+            var di = new DirectoryInfo(dir);
+            di.Attributes = FileAttributes.Normal;
+            di.Delete(true);
+            RemoveReleaseFromLocalVariables(_releases.First(x => x.Directory == dir));
         }
+    }
+
+    void RemoveReleaseFromLocalVariables(StagingRelease release)
+    {
+        if(release?.Directory == null)
+        {
+            return;
+        }
+        var firstRelease = _releases.FirstOrDefault(x => x.Directory == release.Directory);
+        if (firstRelease != null)
+        {
+            _releases.Remove(firstRelease);
+        }
+        firstRelease = _allReleases.FirstOrDefault(x => x.Directory == release.Directory);
+        if (firstRelease != null)
+        {
+            _allReleases.Remove(firstRelease);
+        }        
     }
 
     void EditRelease(StagingRelease release)
@@ -324,8 +335,7 @@
                 try
                 {
                     Directory.Delete(selectedRelease.Directory, true);
-                    _releases.Remove(_releases.First(x => x.Directory == selectedRelease.Directory));
-                    _allReleases.Remove(_releases.First(x => x.Directory == selectedRelease.Directory));
+                    RemoveReleaseFromLocalVariables(selectedRelease);
                     _processingDirectoryProgress++;
                     await InvokeAsync(StateHasChanged);
                     logger.LogInformation("Deleted Release directory [{ dir }]", selectedRelease.Directory);
