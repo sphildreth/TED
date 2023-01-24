@@ -1,4 +1,5 @@
-﻿using TED.Extensions;
+﻿using System.Text.Json;
+using TED.Extensions;
 using TED.Models.MetaData;
 
 namespace TED.Processors
@@ -72,17 +73,13 @@ namespace TED.Processors
                         }
                     }
                 });
+                var roadieDataFileName = Path.Combine(releaseDirectory, $"ted.data.json");
+                File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(release));
             }
             catch (Exception ex)
             {
                 _logger.LogError("Error Saving [{ release }] [{ error}]", release.ToString(), ex.Message);
                 errorMessages.Add(ex.Message);
-            }
-
-            var roadieDataFileName = Path.Combine(releaseDirectory, $"ted.data.json");
-            if (File.Exists(roadieDataFileName))
-            {
-                File.Delete(roadieDataFileName);
             }
             return (!errorMessages.Any(), errorMessages);
         }
