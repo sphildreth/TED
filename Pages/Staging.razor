@@ -10,8 +10,7 @@
 @inject IConfiguration Configuration
 @inject NavigationManager UriHelper
 @inject ILogger<Staging> logger
-@inject ILogger<DirectoryProcessor> directoryProcessorlogger
-@inject ILogger<ReleaseSaveProcessor> releaseProcessorLogger
+@inject ILoggerFactory LoggerFactory
 
 @page "/staging"
 
@@ -140,9 +139,21 @@
     List<StagingRelease> _allReleases = new List<StagingRelease>();
     int _directorysFound = 0;
     int _processingDirectoryProgress = 0;
+    ReleaseEditProcessor _releaseEditProcessor;
+    ILogger<ReleaseSaveProcessor> _releaseSaveProcessorLogger;
+    ILogger<DirectoryProcessor> _directoryProcessorLogger;
 
     public Staging()
     {        
+    }
+
+    private ILogger<ReleaseSaveProcessor> ReleaseSaveProcessorLogger => _releaseSaveProcessorLogger ?? (_releaseSaveProcessorLogger = LoggerFactory.CreateLogger<ReleaseSaveProcessor>());
+
+    private ILogger<DirectoryProcessor> DirectoryProcessorLogger => _directoryProcessorLogger ?? (_directoryProcessorLogger = LoggerFactory.CreateLogger<DirectoryProcessor>());
+
+    protected override async Task OnInitializedAsync()
+    {
+        _releaseEditProcessor = new ReleaseEditProcessor(LoggerFactory.CreateLogger<ReleaseEditProcessor>());
     }
 
     void OpenReleaseDirectory(string dir)
@@ -174,7 +185,7 @@
 
                 }
             }
-            var directoryProcessor = new DirectoryProcessor(directoryProcessorlogger);
+            var directoryProcessor = new DirectoryProcessor(DirectoryProcessorLogger);
             var refreshedRelease = (await directoryProcessor.ProcessAsync(DateTime.UtcNow, dir, Directory.GetFiles(dir))).Adapt<StagingRelease>();
             refreshedRelease.Selected = refreshedRelease.IsValid;
             _releases.Remove(_releases.First(x => x.Directory == dir));
@@ -235,7 +246,7 @@
         parameters.Add("ContentText", "Continue to adjust Releases magically? This process cannot be undone.");
         parameters.Add("ButtonText", "Do Magic");
         parameters.Add("Color", Color.Error);
-        var releaseSaveProcessor = new ReleaseSaveProcessor(releaseProcessorLogger);
+        var releaseSaveProcessor = new ReleaseSaveProcessor(LoggerFactory.CreateLogger<ReleaseSaveProcessor>());
         var editRelease = new EditRelease();
         var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
         var dialog = await DialogService.ShowAsync<Dialog>("Adjust Release MetaData", parameters);
@@ -251,16 +262,17 @@
             {
                 try
                 {
-                    await releaseSaveProcessor.ProcessAsync(now, await editRelease.DoMagic(selectedRelease));
-
-                    _releases.Remove(_releases.First(x => x.Directory == selectedRelease.Directory));
-                    if (_allReleases.Any(x => x.Directory == selectedRelease.Directory))
+                    var processResult = await releaseSaveProcessor.ProcessAsync(now, await _releaseEditProcessor.DoMagic(selectedRelease));
+                    if (processResult.Item1)
                     {
-                        _allReleases.Remove(_allReleases.First(x => x.Directory == selectedRelease.Directory));
+                        _processingDirectoryProgress++;
+                        await InvokeAsync(StateHasChanged);
+                        logger.LogInformation("Performed Magic on Release directory [{ release }]", selectedRelease);
                     }
-                    _processingDirectoryProgress++;
-                    await InvokeAsync(StateHasChanged);
-                    logger.LogInformation("Performed Magic on Release directory [{ release }]", selectedRelease);
+                    else
+                    {
+                        logger.LogWarning("Unable to Perform Magic on Release directory [{ release }] Messages [{ messages }]", selectedRelease, processResult.Item2.ToCsv() );
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -268,7 +280,6 @@
                 }
             });
             _processingDirectoryProgress = 0;
-            StateHasChanged();
             _movingFolders = false;
             await DoScan();
         }
@@ -320,7 +331,7 @@
         _directorysFound = selectedReleases.Count();
         _processingDirectoryProgress = 0;
         var now = DateTime.UtcNow;
-        var saveProcessor = new ReleaseSaveProcessor(releaseProcessorLogger);
+        var saveProcessor = new ReleaseSaveProcessor(ReleaseSaveProcessorLogger);
         await Parallel.ForEachAsync(selectedReleases, async (selectedRelease, cancellationToken) =>
         {
             try
@@ -353,7 +364,7 @@
             var now = DateTime.UtcNow;
             _releases = new List<StagingRelease>();
             var directoryToScan = @Configuration["TED:StagingDirectory"];
-            var directoryProcessor = new DirectoryProcessor(directoryProcessorlogger);
+            var directoryProcessor = new DirectoryProcessor(DirectoryProcessorLogger);
             var directorysToProcess = Directory.EnumerateDirectories(directoryToScan);
             _directorysFound = directorysToProcess.Count();
             var sw = new System.Diagnostics.Stopwatch();

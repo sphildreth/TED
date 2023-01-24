@@ -1,4 +1,5 @@
 using NodaTime;
+using System.ComponentModel.DataAnnotations;
 using System.Reflection.Metadata.Ecma335;
 using System.Text.Json.Serialization;
 using TED.Enums;
@@ -40,7 +41,11 @@ namespace TED.Models.MetaData
         /// </summary>
         public double? DurationMinutes => Duration == null ? null : TimeSpan.FromMilliseconds(Duration.Value).TotalMinutes;
 
-        public string? Directory { get; set; }
+        /// <summary>
+        /// This is the file directory for the Release
+        /// </summary>
+        [Required]
+        public string Directory { get; set; }
 
         public string DurationTime
         {

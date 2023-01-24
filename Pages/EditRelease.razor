@@ -15,19 +15,19 @@
     <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Medium" OnClick="@( async (e) => await DeleteRelease())">Delete</MudButton>
     <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Remove" Color="Color.Warning" Size="Size.Medium" OnClick="@( async (e) => await DeleteReleaseImages())">Delete Release Images</MudButton>
     <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Menu" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Modify Actions">
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( async (e) => await PromoteTrackArtist())">Promote Track Artist</MudMenuItem>
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Numbers" OnClick="@( async (e) => await RenumberTracks())">Renumber Tracks</MudMenuItem>
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( async (e) => await RemoveArtistFromTrackArtists())">Remove Artist From Track Artists</MudMenuItem>
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( async (e) => await RemoveFeaturingArtistFromTrackTitle())">Remove Featuring Artists From Track Title</MudMenuItem>
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( async (e) => await ReplaceTracksArtistSeperators())">Replace Track Artist Seperators</MudMenuItem>
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.CalendarMonth" OnClick="@( async (e) => await SetYearToCurrent())">Set Year To Current</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.PromoteTrackArtist(_release))">Promote Track Artist</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Numbers" OnClick="@( (e) => _releaseEditProcessor.RenumberTracks(_release))">Renumber Tracks</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => ReleaseEditProcessor.RemoveArtistFromTrackArtists(_release))">Remove Artist From Track Artists</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.RemoveFeaturingArtistFromTrackTitle(_release))">Remove Featuring Artists From Track Title</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.ReplaceTracksArtistSeperators(_release))">Replace Track Artist Seperators</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.CalendarMonth" OnClick="@( (e) => _releaseEditProcessor.SetYearToCurrent(_release))">Set Year To Current</MudMenuItem>
     </MudMenu>
     <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.EditNote" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Trim Track Titles">
-        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(1))">1</MudMenuItem>
-        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(2))">2</MudMenuItem>
-        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(3))">3</MudMenuItem>
-        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(4))">4</MudMenuItem>
-        <MudMenuItem OnClick="@( async (e) => await TrimTrackTitles(5))">5</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(1, _release))">1</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(2, _release))">2</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(3, _release))">3</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(4, _release))">4</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(5, _release))">5</MudMenuItem>
     </MudMenu>
 </MudToolBar>
 
@@ -156,6 +156,7 @@
     ReleaseFluentValidator releaseValidator = new ReleaseFluentValidator();
     string[] messageHeadings = { "Type", "Details" };
     bool _submitted = false;
+    ReleaseEditProcessor _releaseEditProcessor;
 
     Release _release = new Release
         {
@@ -207,147 +208,6 @@
                 secondaryReleaseImageInDirectory.Delete();
             });
         }
-    }
-
-    private async Task RemoveArtistFromTrackArtists()
-    {
-        foreach (var media in _release.Media)
-        {
-            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
-            {
-                track.TrackArtist.ArtistData.Text = RemoveArtistFromTrackArtist(_release.Artist?.Text, track.TrackArtist.ArtistData.Text);
-            }
-        }
-    }
-
-    private async Task ReplaceTracksArtistSeperators()
-    {
-        foreach (var media in _release.Media)
-        {
-            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
-            {
-                track.TrackArtist.ArtistData.Text = DirectoryProcessor.ReplaceTrackArtistSeperators(track.TrackArtist.ArtistData.Text);
-            }
-        }
-    }
-
-    private async Task RemoveFeaturingArtistFromTracksArtist()
-    {
-        foreach (var media in _release.Media)
-        {
-            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
-            {
-                var trackArtistFeatureArtist = DirectoryProcessor.RemoveFeaturingArtistFromTrackTitle(track.TrackArtist?.ArtistData.Text);
-                if(trackArtistFeatureArtist.Item1 != null && trackArtistFeatureArtist.Item2 == null)
-                {
-                    track.TrackArtist.ArtistData.Text = trackArtistFeatureArtist.Item1;
-                }
-                else if(trackArtistFeatureArtist.Item1 != null && trackArtistFeatureArtist.Item2 != null &&
-                    !StringExt.DoStringsMatch(_release?.Artist?.Text, trackArtistFeatureArtist.Item1) && 
-                    !StringExt.DoStringsMatch(_release?.Artist?.Text, trackArtistFeatureArtist.Item2))
-                {
-                    track.TrackArtist.ArtistData.Text = $"{trackArtistFeatureArtist.Item1}/{trackArtistFeatureArtist.Item2}";
-                }
-            }
-        }
-    }
-
-    private async Task RemoveFeaturingArtistFromTrackTitle()
-    {
-        foreach (var media in _release.Media)
-        {
-            foreach (var track in media.Tracks.Where(x => x.TrackArtist?.ArtistData != null))
-            {
-                var trackFeatureArtist = DirectoryProcessor.RemoveFeaturingArtistFromTrackTitle(track.Title);
-                track.Title = trackFeatureArtist.Item1 ?? track.Title;
-                if (trackFeatureArtist.Item2 != null && !StringExt.DoStringsMatch(_release?.Artist?.Text, trackFeatureArtist.Item2))
-                {
-                    if (track.TrackArtist.ArtistData.Text.Nullify() != null)
-                    {
-                        track.TrackArtist.ArtistData.Text = $"{track.TrackArtist.ArtistData.Text}/{trackFeatureArtist.Item2}";
-                    }
-                    else
-                    {
-                        track.TrackArtist.ArtistData.Text = trackFeatureArtist.Item2;
-                    }
-                }
-            }
-        }
-    }
-
-    public async Task<Release> DoMagic(Release release)
-    {
-        ReleaseDirectory = release.Directory;
-        _release = release;
-        _release.ReleaseDateDateTime = DateTime.Parse(_release.ReleaseDate ?? DateTime.MinValue.ToString());
-        await RenumberTracks();
-        await RemoveFeaturingArtistFromTracksArtist();
-        await RemoveFeaturingArtistFromTrackTitle();
-        await ReplaceTracksArtistSeperators();
-        if(_release.Year == null)
-        {
-            await SetYearToCurrent();
-        }
-        return _release;
-    }
-
-    public static string? RemoveArtistFromTrackArtist(string? artist, string? trackArtist)
-    {
-        if(artist.Nullify() == null)
-        {
-            return trackArtist;
-        }
-        if(trackArtist.Nullify() == null)
-        {
-            return null;
-        }
-        return Regex.Replace(trackArtist, $"\\s*({artist})\\s*(&|and|with)*", string.Empty).Trim();
-    }
-
-    private async Task RenumberTracks()
-    {
-        var looper = 1;
-        foreach(var media in _release.Media)
-        {
-            looper = 1;
-            foreach (var track in media.Tracks)
-            {
-                track.TrackNumber = looper;
-                looper++;
-            }            
-        }
-        _release.TrackCount = looper;
-    }
-
-    private async Task TrimTrackTitles(int stringLengthToTrim)
-    {
-        foreach (var media in _release.Media)
-        {
-            foreach (var track in media.Tracks.Where(x => x.Title.Nullify() != null))
-            {
-                track.Title = track.Title.Substring(stringLengthToTrim, track.Title.Length - stringLengthToTrim);
-            }
-        }
-    }
-
-    private async Task PromoteTrackArtist()
-    {
-        _release.Artist = _release.Media.First().Tracks.First().TrackArtist.ArtistData;
-        foreach (var media in _release.Media)
-        {
-            foreach (var track in media.Tracks)
-            {
-                track.TrackArtist = new Artist()
-                {
-                    ArtistData = new Models.DataToken()
-                };
-            }
-        }
-    }
-
-    private async Task SetYearToCurrent()
-    {
-        _release.ReleaseDateDateTime = DateTime.UtcNow;
     }
 
     public async Task Submit()
@@ -443,6 +303,7 @@
     {
         ReleaseDirectory = System.Net.WebUtility.UrlDecode(ReleaseDirectory);
         DirectoryProcessor directoryProcessor = new DirectoryProcessor(LoggerFactory.CreateLogger<DirectoryProcessor>());
+        _releaseEditProcessor = new ReleaseEditProcessor(LoggerFactory.CreateLogger<ReleaseEditProcessor>());
         _release = await directoryProcessor.ProcessAsync(DateTime.UtcNow, ReleaseDirectory, Directory.GetFiles(ReleaseDirectory ?? string.Empty)) ?? _release;
         _release.ReleaseDateDateTime = DateTime.Parse(_release.ReleaseDate ?? DateTime.MinValue.ToString());
     }

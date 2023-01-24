@@ -12,7 +12,14 @@ namespace TED.Processors
             _logger = logger;
         }
 
-        public async Task<(bool, IEnumerable<string>?)> ProcessAsync(DateTime now, Release release)
+        /// <summary>
+        /// Do processing for Processing and return success status and processing messages.
+        /// </summary>
+        /// <param name="now">DateTime to use for date marking</param>
+        /// <param name="release">Release to Save</param>
+        /// <returns>Tuple of processing success and any processing messages</returns>
+        /// <exception cref="Exception">Processing exception</exception>
+        public async Task<(bool, IEnumerable<string>)> ProcessAsync(DateTime now, Release release)
         {
             var errorMessages = new List<string>();
             var releaseDirectory = release.Directory ?? throw new Exception("Invalid directory on Release");

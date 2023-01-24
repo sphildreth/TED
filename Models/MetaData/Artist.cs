@@ -1,10 +1,12 @@
 using NodaTime;
+using System.Diagnostics;
 using TED.Enums;
 using TED.Utility;
 
 namespace TED.Models.MetaData
 {
     [Serializable]
+    [DebuggerDisplay("ArtistData [{ ArtistData }]")]
     public sealed class Artist : MetaDataBase
     {
         public Artist()
@@ -33,5 +35,6 @@ namespace TED.Models.MetaData
         public Statuses? Status { get; set; }
 
         public string StatusVerbose => (Status ?? Statuses.Missing).ToString();
+
     }
 }
