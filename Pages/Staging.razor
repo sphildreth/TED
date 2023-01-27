@@ -400,6 +400,7 @@
             sw.Start();
             foreach (var dir in directorysToProcess)
             {
+                logger.LogDebug("Scanning [{ folder }]", dir);
                 StagingRelease? releaseForDirectory = null;
                 var filesInDirectory = Directory.GetFiles(dir);
                 if (filesInDirectory.Any())
@@ -414,8 +415,9 @@
                         }
                     }
                 }
-                foreach (var subDir in Directory.GetDirectories(dir, "*", SearchOption.AllDirectories))
+                foreach (var subDir in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
                 {
+                    logger.LogDebug("Scanning [{ folder }] Directory [{ subDir }]", dir, subDir);
                     var filesInSubDirectory = Directory.GetFiles(subDir);
                     if (filesInSubDirectory.Any())
                     {
@@ -440,6 +442,7 @@
             _processingDirectoryProgress = 0;
             StateHasChanged();
             _allReleases = _releases;
+            logger.LogDebug("Scanning Completed. Elapsed Time [{ elapsedTime }]", (DateTime.UtcNow - now).TotalMilliseconds);
         }
     }
 }
