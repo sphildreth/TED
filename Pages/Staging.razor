@@ -412,6 +412,10 @@
                         {
                             releaseForDirectory.Selected = releaseForDirectory.IsValid;
                             _releases.Add(releaseForDirectory);
+                            sw.Stop();
+                            StateHasChanged();
+                            logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", dir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
+                            sw.Restart();
                         }
                     }
                 }
@@ -426,23 +430,20 @@
                         {
                             releaseForDirectory.Selected = releaseForDirectory.IsValid;
                             _releases.Add(releaseForDirectory);
+                            sw.Stop();
+                            StateHasChanged();
+                            logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
+                            sw.Restart();
                         }
                     }
                 }
-                sw.Stop();
-                if (releaseForDirectory != null)
-                {
-                    logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", dir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
-                }
                 _processingDirectoryProgress++;
-                StateHasChanged();
-                sw.Restart();
             }
             _scanning = false;
             _processingDirectoryProgress = 0;
             StateHasChanged();
             _allReleases = _releases;
-            logger.LogDebug("Scanning Completed. Elapsed Time [{ elapsedTime }]", (DateTime.UtcNow - now).TotalMilliseconds);
+            logger.LogDebug("** Scanning Completed. Elapsed Time [{ elapsedTime }]", (DateTime.UtcNow - now).TotalMilliseconds);
         }
     }
 }

@@ -1,11 +1,13 @@
-﻿using FFMpegCore;
-using FFMpegCore.Builders.MetaData;
+﻿using ATL.CatalogDataReaders;
+using FFMpegCore;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using TED.Enums;
 using TED.Extensions;
 using TED.Models;
+using cue = TED.Models.CueSheet;
+using TED.Models.CueSheet.Parsers;
 using TED.Models.MetaData;
 using TED.Utility;
 
@@ -13,7 +15,7 @@ namespace TED.Processors
 {
     public sealed class DirectoryProcessor
     {
-		public const int MaximumDiscNumber = 500;
+        public const int MaximumDiscNumber = 500;
 
         public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -56,7 +58,7 @@ namespace TED.Processors
             }
             try
             {
-                // If TED file exists and is "reviewed" then don't recreate 
+                // If TED file exists and is "reviewed" then don't recreate
                 var existingTedDataFile = filesInDirectory.FirstOrDefault(x => x.EndsWith(TedJSONFileName, StringComparison.OrdinalIgnoreCase));
                 if (!doForceProcessing && existingTedDataFile != null)
                 {
@@ -73,7 +75,7 @@ namespace TED.Processors
                     {
                         filesInDirectory = Directory.GetFiles(dir);
                     }
-				}
+                }
 
                 foreach (var file in filesInDirectory)
                 {
@@ -181,6 +183,7 @@ namespace TED.Processors
                         var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => !string.Equals(x.AudioFormat.ShortName, "mpeg", StringComparison.OrdinalIgnoreCase));
                         if (doesReleaseHaveNonMp3Tracks)
                         {
+                            await CheckIfDirectoryHasCueFile(dir);
                             tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound);
                         }
                         var medias = new List<ReleaseMedia>();
@@ -302,6 +305,7 @@ namespace TED.Processors
                                 releaseData.ProcessingMessages.Add(new ProcessMessage($"Release Year [{releaseData.Year ?? 0}] is invalid", false, ProcessMessage.BadCheckMark));
                             }
                         }
+
                         var roadieDataFileName = Path.Combine(dir, TedJSONFileName);
                         System.IO.File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(releaseData));
 
@@ -370,6 +374,38 @@ namespace TED.Processors
             return release;
         }
 
+        private Task CheckIfDirectoryHasCueFile(string dir)
+        {
+            var CUEFileForReleaseDirectory = Directory.GetFiles(dir, "*.cue").FirstOrDefault();
+            if (CUEFileForReleaseDirectory != null)
+            {
+                ICatalogDataReader theReader = CatalogDataReaderFactory.GetInstance().GetCatalogDataReader(CUEFileForReleaseDirectory);
+                if (theReader != null)
+                {
+                    var cueSheetParser = new CueSheetParser(CUEFileForReleaseDirectory);
+                    var splitter = new cue.CueSheetSplitter(cueSheetParser.Parse(), CUEFileForReleaseDirectory, (filePath, mp3FileName, skip, until) =>
+                    {
+                        return FFMpegArguments.FromFileInput(filePath)
+                        .OutputToFile(mp3FileName, true, options =>
+                        {
+                            var seekTs = new TimeSpan(0, skip.IndexTime.Minutes, skip.IndexTime.Seconds);
+                            var untilTs = new TimeSpan(0, until.IndexTime.Minutes, until.IndexTime.Seconds);
+                            var durationTs = untilTs - seekTs;
+                            options.Seek(seekTs);
+                            options.WithDuration(durationTs); 
+                            options.WithAudioBitrate(FFMpegCore.Enums.AudioQuality.Ultra);
+                            options.WithAudioCodec("mp3").ForceFormat("mp3");
+                        })
+                        .ProcessSynchronously(true);
+                    });
+                    var splitResults = splitter.Split();
+
+                    Console.WriteLine("do something");
+                }
+            }
+            throw new NotImplementedException();
+        }
+
         public async Task CheckIfDirectoryHasMultipleReleases(DateTime now, string? dir)
         {
             var allSFVFilesInReleaseDirectory = Directory.GetFiles(dir, "*.sfv");
@@ -409,50 +445,50 @@ namespace TED.Processors
         private bool ProcessSubDirectory(string releaseDirectory, DirectoryInfo subDirectory)
         {
             var processingFoundNewFiles = false;
-            if(IsDirectoryMediaDirectory(subDirectory.FullName))
+            if (IsDirectoryMediaDirectory(subDirectory.FullName))
             {
-				var subDirectoryFiles = subDirectory.GetFiles("*.*", SearchOption.TopDirectoryOnly);
-				if (subDirectoryFiles.Any())
-				{
+                var subDirectoryFiles = subDirectory.GetFiles("*.*", SearchOption.TopDirectoryOnly);
+                if (subDirectoryFiles.Any())
+                {
                     Parallel.ForEach(subDirectoryFiles, subDirectoryFile =>
                     {
                         var fileAtl = new ATL.Track(subDirectoryFile.FullName);
                         if (fileAtl.AudioFormat.ID > -1 && fileAtl.Duration > 0)
                         {
-							try
-							{
+                            try
+                            {
                                 var mediaNumber = fileAtl.DiscNumber ?? DetermineMediaNumberFromDirectory(subDirectory.Name);
-								File.SetAttributes(subDirectoryFile.FullName, FileAttributes.Normal);
-                                var newMediaFileName = Path.Combine(releaseDirectory, $"m{mediaNumber.ToStringPadLeft(3)} {subDirectoryFile.Name}");
+                                File.SetAttributes(subDirectoryFile.FullName, FileAttributes.Normal);
+                                var newMediaFileName = Path.Combine(subDirectory.Parent.FullName, $"m{mediaNumber.ToStringPadLeft(3)} {subDirectoryFile.Name}");
                                 subDirectoryFile.MoveTo(newMediaFileName);
-							}
-							catch (Exception ex)
-							{
-								_logger.LogError("Error Moving Media File [{subDirectoryFile}]: [{error}]", subDirectoryFile.FullName, ex.Message);
-							}
-						}
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError("Error Moving Media File [{subDirectoryFile}]: [{error}]", subDirectoryFile.FullName, ex.Message);
+                            }
+                        }
                     });
                     processingFoundNewFiles = true;
-				}
-			}
-            var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
-            coverImages.AddRange((ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.ReleaseSecondary) ?? Enumerable.Empty<FileInfo>()));
-            if (coverImages?.Any() ?? false)
-            {
-                Parallel.ForEach(coverImages, coverImage =>
+                }
+                var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
+                coverImages.AddRange((ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.ReleaseSecondary) ?? Enumerable.Empty<FileInfo>()));
+                if (coverImages?.Any() ?? false)
                 {
-                    try
+                    Parallel.ForEach(coverImages, coverImage =>
                     {
-                        File.SetAttributes(coverImage.FullName, FileAttributes.Normal);
-                        File.Move(coverImage.FullName, Path.Combine(releaseDirectory, coverImage.Name), true);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
-                    }
-                });
-				processingFoundNewFiles = true;
-			}
+                        try
+                        {
+                            File.SetAttributes(coverImage.FullName, FileAttributes.Normal);
+                            File.Move(coverImage.FullName, Path.Combine(subDirectory.Parent.FullName, coverImage.Name), true);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
+                        }
+                    });
+                    processingFoundNewFiles = true;
+                }
+            }
             return processingFoundNewFiles;
         }
 
@@ -538,7 +574,6 @@ namespace TED.Processors
                         Bytes = await File.ReadAllBytesAsync(foundImageFileName)
                     }, 1, 0);
                 }
-
             }
             catch (Exception ex)
             {
@@ -635,7 +670,7 @@ namespace TED.Processors
             {
                 return true;
             }
-            if(StringHasFeaturingFragments(trackTitle))
+            if (StringHasFeaturingFragments(trackTitle))
             {
                 return true;
             }
@@ -651,14 +686,13 @@ namespace TED.Processors
                     {
                         return true;
                     }
-                    return Regex.IsMatch(trackTitle, $"^({ Regex.Escape(releaseTitle)}\\s*.*\\s*)?([0-9]*{trackNumber}\\s)");
+                    return Regex.IsMatch(trackTitle, $"^({Regex.Escape(releaseTitle)}\\s*.*\\s*)?([0-9]*{trackNumber}\\s)");
                 }
-
             }
             catch (Exception ex)
             {
-                Console.Write($"TrackHasUnwantedText For ReleaseTitle [{releaseTitle}] for TrackTitle [{trackTitle}] Error [{ ex.Message }] ", "Error");
-            }            
+                Console.Write($"TrackHasUnwantedText For ReleaseTitle [{releaseTitle}] for TrackTitle [{trackTitle}] Error [{ex.Message}] ", "Error");
+            }
             return false;
         }
 
@@ -746,7 +780,7 @@ namespace TED.Processors
             {
                 return (null, null);
             }
-            if(!StringHasFeaturingFragments(trackTitle))
+            if (!StringHasFeaturingFragments(trackTitle))
             {
                 return (trackTitle, null);
             }
@@ -760,28 +794,27 @@ namespace TED.Processors
 
         public static int? DetermineMediaNumberFromDirectory(string dir)
         {
-			if (dir.Nullify() == null)
-			{
-				return null;
-			}
-			for (var i = MaximumDiscNumber; i > 0; i--)
+            if (dir.Nullify() == null)
             {
-				if (Regex.IsMatch(dir, @"(cd\s*(0*" + i + "))", RegexOptions.IgnoreCase))
-				{
-					return i;
-				}
-			}
-			return 1;
-		}
+                return null;
+            }
+            for (var i = MaximumDiscNumber; i > 0; i--)
+            {
+                if (Regex.IsMatch(dir, @"(cd\s*(0*" + i + "))", RegexOptions.IgnoreCase))
+                {
+                    return i;
+                }
+            }
+            return 1;
+        }
 
-
-		public static bool IsDirectoryMediaDirectory(string dir)
+        public static bool IsDirectoryMediaDirectory(string dir)
         {
-            if(dir.Nullify() == null)
+            if (dir.Nullify() == null)
             {
                 return false;
             }
-            return Regex.IsMatch(dir, $"(\\s*CD[0-9]+)", RegexOptions.IgnoreCase);
+            return Regex.IsMatch(dir, $"(\\s*CD.*[0-9]+)", RegexOptions.IgnoreCase);
         }
 
         public static void DeleteDirectory(string target_dir)

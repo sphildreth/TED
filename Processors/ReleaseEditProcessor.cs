@@ -1,5 +1,4 @@
-﻿using ATL.AudioData.IO;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using TED.Extensions;
 using TED.Models.MetaData;
 using TED.Utility;
@@ -201,7 +200,7 @@ namespace TED.Processors
 
         public void RemoveTextFromTracks(Release release, string text)
         {
-            if(text.Nullify() == null)
+            if (text.Nullify() == null)
             {
                 return;
             }
@@ -211,7 +210,7 @@ namespace TED.Processors
                 var tracks = (media.Tracks ?? Enumerable.Empty<Track>()).OrderBy(x => x.TrackNumber).ToList();
                 foreach (var track in tracks)
                 {
-                    if(track.Title.Nullify() != null)
+                    if (track.Title.Nullify() != null)
                     {
                         track.Title = track.Title.Replace(text, string.Empty).Trim();
                     }
@@ -220,7 +219,6 @@ namespace TED.Processors
             }
             release.Media = medias;
         }
-
 
         public void RemoveFeaturingArtistFromTracksArtist(Release release)
         {
@@ -277,9 +275,9 @@ namespace TED.Processors
 
         public static bool IsValidReleaseYear(int? year)
         {
-            if (year == null) 
-            { 
-                return false; 
+            if (year == null)
+            {
+                return false;
             }
             return year.Value >= MinimumYearValue && year.Value <= DateTime.UtcNow.Year + 1;
         }
