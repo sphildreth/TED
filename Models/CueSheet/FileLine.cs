@@ -18,6 +18,10 @@ namespace TED.Models.CueSheet
             _line = line.Trim();
             _rawParts = Array.AsReadOnly(_line.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries));
             _command = _rawParts[0].ToUpperInvariant();
+            if(string.Equals(_command, "REM"))
+            {
+                _command = $"{_rawParts[0].ToUpperInvariant()} {_rawParts[1].ToUpperInvariant()}";
+            }
         }
 
         public string Command

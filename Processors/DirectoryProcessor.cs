@@ -10,6 +10,8 @@ using cue = TED.Models.CueSheet;
 using TED.Models.CueSheet.Parsers;
 using TED.Models.MetaData;
 using TED.Utility;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Razor.Hosting;
 
 namespace TED.Processors
 {
@@ -374,36 +376,85 @@ namespace TED.Processors
             return release;
         }
 
-        private Task CheckIfDirectoryHasCueFile(string dir)
+        private async Task CheckIfDirectoryHasCueFile(string dir)
         {
-            var CUEFileForReleaseDirectory = Directory.GetFiles(dir, "*.cue").FirstOrDefault();
+            var isrcCueSheets = Directory.GetFiles(dir, "*.cue");
+            if (isrcCueSheets.Any())
+            {
+                foreach(var isrc in isrcCueSheets)
+                {
+                    if (isrc.Contains("isrc.cue", StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.SetAttributes(isrc, FileAttributes.Normal);
+                        File.Delete(isrc);
+                    }
+                }
+            }
+            var CUEFileForReleaseDirectory = isrcCueSheets.FirstOrDefault();
             if (CUEFileForReleaseDirectory != null)
             {
                 ICatalogDataReader theReader = CatalogDataReaderFactory.GetInstance().GetCatalogDataReader(CUEFileForReleaseDirectory);
                 if (theReader != null)
                 {
                     var cueSheetParser = new CueSheetParser(CUEFileForReleaseDirectory);
-                    var splitter = new cue.CueSheetSplitter(cueSheetParser.Parse(), CUEFileForReleaseDirectory, (filePath, mp3FileName, skip, until) =>
+                    var cueSheet = cueSheetParser.Parse();
+                    var splitter = new cue.CueSheetSplitter(cueSheet, CUEFileForReleaseDirectory, (filePath, mp3FileName, skip, until) =>
                     {
                         return FFMpegArguments.FromFileInput(filePath)
                         .OutputToFile(mp3FileName, true, options =>
                         {
                             var seekTs = new TimeSpan(0, skip.IndexTime.Minutes, skip.IndexTime.Seconds);
-                            var untilTs = new TimeSpan(0, until.IndexTime.Minutes, until.IndexTime.Seconds);
-                            var durationTs = untilTs - seekTs;
                             options.Seek(seekTs);
-                            options.WithDuration(durationTs); 
+                            if (until != null)
+                            {
+                                var untilTs = new TimeSpan(0, until.IndexTime.Minutes, until.IndexTime.Seconds);
+                                var durationTs = untilTs - seekTs;
+                                options.WithDuration(durationTs);
+                            }
                             options.WithAudioBitrate(FFMpegCore.Enums.AudioQuality.Ultra);
                             options.WithAudioCodec("mp3").ForceFormat("mp3");
                         })
-                        .ProcessSynchronously(true);
+                        .ProcessAsynchronously(true);
                     });
-                    var splitResults = splitter.Split();
+                    var splitResults = await splitter.Split();
 
-                    Console.WriteLine("do something");
+                    var releaseArtist = theReader.Artist ?? throw new Exception("Invalid Artist");
+                    Parallel.ForEach(splitResults, split =>
+                    {
+                        var fileAtl = new ATL.Track(split.FilePath);
+                        fileAtl.Album = theReader.Title ?? throw new Exception("Invalid Release Title");
+                        fileAtl.AlbumArtist = releaseArtist;
+                        fileAtl.Comment = "";
+                        var readerTrack = theReader.Tracks.FirstOrDefault(x => x.TrackNumber == split.Track.TrackNum) ?? throw new Exception("Unable to find Track for file");
+                        fileAtl.Title = readerTrack.Title ?? throw new Exception("Invalid Track Title");
+                        fileAtl.TrackNumber = readerTrack.TrackNumber;
+                        fileAtl.TrackTotal = theReader.Tracks.Count();
+                        fileAtl.Genre = readerTrack.Genre;
+                        fileAtl.Year = SafeParser.ToNumber<int?>(cueSheet.Date) ?? throw new Exception("Invalid Release year");
+                        var trackArtist = readerTrack.Artist.Nullify();
+                        if (trackArtist != null && !StringExt.DoStringsMatch(releaseArtist, trackArtist))
+                        {
+                            fileAtl.Artist = trackArtist;
+                        }
+                        else
+                        {
+                            fileAtl.Artist = string.Empty;
+                        }
+                        if (!fileAtl.Save())
+                        {
+                            throw new Exception($"Unable to update metadata for file [{fileAtl.FileInfo().FullName}]");
+                        }
+                    });
+                    foreach(var cueFile in cueSheet.Files)
+                    {
+                        var fn = Path.Combine(dir, cueFile.FileName);
+                        File.SetAttributes(fn, FileAttributes.Normal);
+                        File.Delete(fn);
+                    }
+                    File.SetAttributes(CUEFileForReleaseDirectory, FileAttributes.Normal);
+                    File.Delete(CUEFileForReleaseDirectory);
                 }
             }
-            throw new NotImplementedException();
         }
 
         public async Task CheckIfDirectoryHasMultipleReleases(DateTime now, string? dir)

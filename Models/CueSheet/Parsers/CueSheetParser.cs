@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MudBlazor.Charts;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -154,7 +155,22 @@ namespace TED.Models.CueSheet.Parsers
             {
                 switch (fileLine.Command)
                 {
-                    case "REM":
+                    case "REM GENRE":
+                    {
+                        _cueSheet.Genre = fileLine.RawParts.Skip(2).ToCsv(" ");
+                        break;
+                    }
+                    case "REM DATE":
+                    {
+                        _cueSheet.Date = fileLine.RawParts.Skip(2).ToCsv(" ");
+                        break;
+                    }
+                    case "REM DISCID":
+                    {
+                        _cueSheet.DiscId = fileLine.RawParts.Skip(2).ToCsv(" ");
+                        break;
+                    }
+                    case "REM COMMENT":
                     {
                         _cueSheet.Comments.Add(new FileLineCommentParser(fileLine).Parse());
                         break;

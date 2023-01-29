@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-
-namespace TED.Models.CueSheet
+﻿namespace TED.Models.CueSheet
 {
     public class CueSheet
     {
-        readonly List<Tuple<string, string>> _comments = new List<Tuple<string, string>>();
-        readonly List<File> _files = new List<File>();
+        private readonly List<Tuple<string, string>> _comments = new List<Tuple<string, string>>();
+
+        private readonly List<File> _files = new List<File>();
 
         public string Catalog { get; set; }
 
@@ -34,6 +30,12 @@ namespace TED.Models.CueSheet
 
         public bool IsNoncompliant { get; set; }
 
+        public string Genre { get; internal set; }
+
+        public string Date { get; internal set; }
+
+        public string DiscId { get; internal set; }
+
         public bool TryGetCommentValue(string name, out string value)
         {
             value = null;
@@ -53,6 +55,5 @@ namespace TED.Models.CueSheet
 
             return (indexOf + 1 < tracks.Count) ? tracks[indexOf + 1] : null;
         }
-
     }
 }
