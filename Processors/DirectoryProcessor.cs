@@ -906,7 +906,7 @@ namespace TED.Processors
             {
                 return false;
             }
-            return Regex.IsMatch(dir, $"(\\s*CD[.\\S]*[0-9]+)", RegexOptions.IgnoreCase);
+            return Regex.IsMatch(dir, $"(\\s*(CD[.\\S]*[0-9])|(CD\\s[0-9])+)", RegexOptions.IgnoreCase);
         }
 
         public static void DeleteDirectory(string target_dir)
