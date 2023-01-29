@@ -185,6 +185,12 @@
 
                 }
             }
+            Parallel.ForEach(Directory.GetFiles(dir, "*.mp3", SearchOption.TopDirectoryOnly), file =>
+            {
+                var atl = new ATL.Track(file);
+                atl.EmbeddedPictures.Clear();
+                atl.Save();
+            });
             var parentDirectory = Directory.GetParent(dir).FullName;
             var isParentDirectoryInboundFolder = string.Equals(parentDirectory, @Configuration["TED:StagingDirectory"], StringComparison.OrdinalIgnoreCase);
             if (!isParentDirectoryInboundFolder)

@@ -567,10 +567,10 @@ namespace TED.Processors
                     });
                     processingFoundNewFiles = true;
                 }
-                if(!subDirectory.GetFiles().Any())
-                {
-                    DeleteDirectory(subDirectory.FullName);
-                }
+                //if(!subDirectory.GetFiles().Any())
+                //{
+                //    DeleteDirectory(subDirectory.FullName);
+                //}
             }
             return processingFoundNewFiles;
         }
