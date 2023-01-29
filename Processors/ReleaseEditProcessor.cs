@@ -158,6 +158,24 @@ namespace TED.Processors
             release.ReleaseDateDateTime = DateTime.UtcNow;
         }
 
+        public static void RemoveTrackArtistFromTracks(Release release)
+        {
+            var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();
+            foreach (var media in medias)
+            {
+                var tracks = (media.Tracks ?? Enumerable.Empty<Track>()).OrderBy(x => x.TrackNumber).ToList();
+                foreach (var track in tracks.Where(x => x.TrackArtist?.ArtistData != null))
+                {
+                    track.TrackArtist = new Artist()
+                    {
+                        ArtistData = new Models.DataToken()
+                    };
+                }
+                media.Tracks = tracks;
+            }
+            release.Media = medias;
+        }
+
         public static void RemoveArtistFromTrackArtists(Release release)
         {
             var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();

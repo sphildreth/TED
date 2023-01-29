@@ -79,9 +79,11 @@ namespace TED.Models.CueSheet
                     }
                     filePath = Path.Combine(cueDirName, fileName);
                 }
-
-                await _buildArgsFunc(filePath, tempWavPath, skip, until);
-                results.Add(new SplitResult(track, tempWavPath));
+                if (System.IO.File.Exists(filePath))
+                {
+                    await _buildArgsFunc(filePath, tempWavPath, skip, until);
+                    results.Add(new SplitResult(track, tempWavPath));
+                }
             });
             return results;
         }

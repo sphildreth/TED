@@ -7,6 +7,7 @@ using System.Text;
 using TED.Extensions;
 using TED.Models.CueSheet;
 using TED.Models.CueSheet.Parsers;
+using TED.Utility;
 
 namespace TED.Models.CueSheet.Parsers
 {
@@ -173,6 +174,16 @@ namespace TED.Models.CueSheet.Parsers
                     case "REM COMMENT":
                     {
                         _cueSheet.Comments.Add(new FileLineCommentParser(fileLine).Parse());
+                        break;
+                    }
+                    case "REM DISCNUMBER":
+                    {
+                        _cueSheet.DiscNumber = SafeParser.ToNumber<int?>(fileLine.RawParts.Skip(2).ToCsv(" "));
+                        break;
+                    }
+                    case "REM TOTALDISCS":
+                    {
+                        _cueSheet.DiscTotal = SafeParser.ToNumber<int?>(fileLine.RawParts.Skip(2).ToCsv(" "));
                         break;
                     }
                     case "CATALOG":

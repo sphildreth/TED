@@ -18,11 +18,12 @@
     <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Menu" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Modify Actions">
         <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.PromoteTrackArtist(_release))">Promote Track Artist</MudMenuItem>
         <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Numbers" OnClick="@( (e) => _releaseEditProcessor.RenumberTracks(_release))">Renumber Tracks</MudMenuItem>
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => ReleaseEditProcessor.RemoveArtistFromTrackArtists(_release))">Remove Artist From Track Artists</MudMenuItem>
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.RemoveFeaturingArtistFromTrackTitle(_release))">Remove Featuring Artists From Track Title</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => ReleaseEditProcessor.RemoveArtistFromTrackArtists(_release))">Remove Artist from Track Artists</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.RemoveFeaturingArtistFromTrackTitle(_release))">Remove Featuring Artists from Track Title</MudMenuItem>
         <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.EditNote" OnClick="@( async (e) => await RemoveTextFromTrackTitles())">Remove text from Track Titles</MudMenuItem>
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.ReplaceTracksArtistSeperators(_release))">Replace Track Artist Seperators</MudMenuItem>
-        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.CalendarMonth" OnClick="@( (e) => _releaseEditProcessor.SetYearToCurrent(_release))">Set Year To Current</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => ReleaseEditProcessor.RemoveTrackArtistFromTracks(_release))">Remove Track Artists</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.ReplaceTracksArtistSeperators(_release))">Replace Track Artist seperators</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.CalendarMonth" OnClick="@( (e) => _releaseEditProcessor.SetYearToCurrent(_release))">Set Year To current</MudMenuItem>
     </MudMenu>
     <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.EditNote" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Trim Track Titles">
         <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(1, _release))">1</MudMenuItem>
@@ -67,6 +68,7 @@
                     <MudDatePicker @bind-Date="_release.ReleaseDateDateTime"
                                    For="@(() => _release.ReleaseDateDateTime)"
                                    Label="Release Date"
+                                   Editable="true"
                                    DateFormat="yyyy-MM-dd" />
                     <MudSimpleTable Style="pa-4 overflow-x: auto;0" Hover="true" Striped="true">
                     <colgroup>

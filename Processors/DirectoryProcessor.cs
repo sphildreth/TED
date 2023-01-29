@@ -19,7 +19,7 @@ namespace TED.Processors
     {
         public const int MaximumDiscNumber = 500;
 
-        public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web|\(320\))+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static readonly Regex UnwantedTrackTitleTextRegex = new(@"(\s{2,}|(\s\(prod\s))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -52,6 +52,13 @@ namespace TED.Processors
                 release.Status = Statuses.NoMediaFiles;
                 return release;
             }
+            foreach (var subDir in Directory.GetDirectories(dir, "*.*", SearchOption.AllDirectories))
+            {
+                if (ProcessSubDirectory(dir, new DirectoryInfo(subDir), _logger))
+                {
+                    filesInDirectory = Directory.GetFiles(subDir);
+                }
+            }
             if (!filesInDirectory.Any())
             {
                 release.ProcessingMessages.Add(ProcessMessage.MakeBadMessage("No files found in dir"));
@@ -71,14 +78,6 @@ namespace TED.Processors
                         return rr;
                     }
                 }
-                foreach (var subDir in Directory.GetDirectories(dir, "*.*", SearchOption.AllDirectories))
-                {
-                    if (ProcessSubDirectory(dir, new DirectoryInfo(subDir)))
-                    {
-                        filesInDirectory = Directory.GetFiles(dir);
-                    }
-                }
-
                 foreach (var file in filesInDirectory)
                 {
                     var fileAtl = new ATL.Track(file);
@@ -383,7 +382,7 @@ namespace TED.Processors
             return release;
         }
 
-        private async Task<(bool, IEnumerable<ATL.Track>)> CheckIfDirectoryHasCueFile(string dir)
+        private async Task<(bool, IEnumerable<ATL.Track>?)> CheckIfDirectoryHasCueFile(string dir)
         {
             var result = new ConcurrentBag<ATL.Track>();
             var isrcCueSheets = Directory.GetFiles(dir, "*.cue");
@@ -401,7 +400,16 @@ namespace TED.Processors
             var CUEFileForReleaseDirectory = isrcCueSheets.FirstOrDefault();
             if (CUEFileForReleaseDirectory != null)
             {
-                ICatalogDataReader theReader = CatalogDataReaderFactory.GetInstance().GetCatalogDataReader(CUEFileForReleaseDirectory);
+                ICatalogDataReader theReader;
+                try
+                {
+                    theReader = CatalogDataReaderFactory.GetInstance().GetCatalogDataReader(CUEFileForReleaseDirectory);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Error reading CUE [{ CUEFileForReleaseDirectory }] [{ex}", CUEFileForReleaseDirectory, ex.ToString());
+                    return (false, null);
+                }
                 if (theReader != null)
                 {
                     var cueSheetParser = new CueSheetParser(CUEFileForReleaseDirectory);
@@ -433,13 +441,14 @@ namespace TED.Processors
                         fileAtl.Album = theReader.Title ?? throw new Exception("Invalid Release Title");
                         fileAtl.AlbumArtist = releaseArtist;
                         fileAtl.Comment = string.Empty;
-                        fileAtl.DiscNumber = 1; // I think in a multi-media release with CUE each media gets it own CUE? See https://wiki.hydrogenaud.io/index.php?title=Cue_sheet
+                        fileAtl.DiscNumber = cueSheet.DiscNumber ?? 1;
+                        fileAtl.DiscTotal = cueSheet.DiscTotal ?? 1;
                         var readerTrack = theReader.Tracks.FirstOrDefault(x => x.TrackNumber == split.Track.TrackNum) ?? throw new Exception("Unable to find Track for file");
                         fileAtl.Title = readerTrack.Title ?? throw new Exception("Invalid Track Title");
                         fileAtl.TrackNumber = readerTrack.TrackNumber;
                         fileAtl.TrackTotal = theReader.Tracks.Count();
                         fileAtl.Genre = readerTrack.Genre;
-                        fileAtl.Year = SafeParser.ToNumber<int?>(cueSheet.Date) ?? throw new Exception("Invalid Release year");
+                        fileAtl.Year = SafeParser.ToDateTime(cueSheet.Date)?.Year ?? throw new Exception("Invalid Release year");
                         var trackArtist = readerTrack.Artist.Nullify();
                         if (trackArtist != null && !StringExt.DoStringsMatch(releaseArtist, trackArtist))
                         {
@@ -458,12 +467,15 @@ namespace TED.Processors
                     foreach(var cueFile in cueSheet.Files)
                     {
                         var fn = Path.Combine(dir, cueFile.FileName);
-                        File.SetAttributes(fn, FileAttributes.Normal);
-                        File.Delete(fn);
+                        if (File.Exists(fn))
+                        {
+                            File.SetAttributes(fn, FileAttributes.Normal);
+                            File.Delete(fn);
+                        }
                     }
                     File.SetAttributes(CUEFileForReleaseDirectory, FileAttributes.Normal);
                     File.Delete(CUEFileForReleaseDirectory);
-                    return (true, result);
+                    return (result.Any(), result);
                 }
             }
             return (false, null);
@@ -505,7 +517,7 @@ namespace TED.Processors
             }
         }
 
-        private bool ProcessSubDirectory(string releaseDirectory, DirectoryInfo subDirectory)
+        public static bool ProcessSubDirectory(string releaseDirectory, DirectoryInfo subDirectory, ILogger logger)
         {
             var processingFoundNewFiles = false;
             if (IsDirectoryMediaDirectory(subDirectory.FullName))
@@ -521,13 +533,17 @@ namespace TED.Processors
                             try
                             {
                                 var mediaNumber = fileAtl.DiscNumber ?? DetermineMediaNumberFromDirectory(subDirectory.Name);
+                                if((mediaNumber ?? 0) < 1)
+                                {
+                                    mediaNumber = 1;
+                                }
                                 File.SetAttributes(subDirectoryFile.FullName, FileAttributes.Normal);
                                 var newMediaFileName = Path.Combine(subDirectory.Parent.FullName, $"m{mediaNumber.ToStringPadLeft(3)} {subDirectoryFile.Name}");
                                 subDirectoryFile.MoveTo(newMediaFileName);
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError("Error Moving Media File [{subDirectoryFile}]: [{error}]", subDirectoryFile.FullName, ex.Message);
+                                logger.LogError("Error Moving Media File [{subDirectoryFile}]: [{error}]", subDirectoryFile.FullName, ex.Message);
                             }
                         }
                     });
@@ -546,10 +562,14 @@ namespace TED.Processors
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
+                            logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
                         }
                     });
                     processingFoundNewFiles = true;
+                }
+                if(!subDirectory.GetFiles().Any())
+                {
+                    DeleteDirectory(subDirectory.FullName);
                 }
             }
             return processingFoundNewFiles;
@@ -869,6 +889,15 @@ namespace TED.Processors
                 }
             }
             return 1;
+        }
+
+        public static bool IsCoverImagesDirectory(string dir)
+        {
+            if (dir.Nullify() == null)
+            {
+                return false;
+            }
+            return Regex.IsMatch(dir, $"cover(s*)|scans", RegexOptions.IgnoreCase);
         }
 
         public static bool IsDirectoryMediaDirectory(string dir)
