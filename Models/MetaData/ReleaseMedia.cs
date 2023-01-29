@@ -36,7 +36,7 @@ namespace TED.Models.MetaData
 
         public override string ToString()
         {
-            return $"MediaNumber [{ MediaNumber}] TrackCount [{ TrackCount}]";
+            return $"MediaNumber [{MediaNumber}] TrackCount [{TrackCount}]";
         }
     }
 }

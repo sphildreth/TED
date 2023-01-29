@@ -1,19 +1,12 @@
-﻿using MudBlazor.Charts;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
+﻿using System.Text;
 using TED.Extensions;
-using TED.Models.CueSheet;
-using TED.Models.CueSheet.Parsers;
 using TED.Utility;
 
 namespace TED.Models.CueSheet.Parsers
 {
     public class CueSheetParser : IParser<CueSheet>
     {
-        static readonly Dictionary<string, Action<CueSheet, string>> CueSheetSingleValueCommands =
+        private static readonly Dictionary<string, Action<CueSheet, string>> CueSheetSingleValueCommands =
             new Dictionary<string, Action<CueSheet, string>>
             {
                 { "CATALOG", (sheet, val) => { sheet.Catalog = val; } },
@@ -23,14 +16,15 @@ namespace TED.Models.CueSheet.Parsers
                 { "TITLE", (sheet, val) => { sheet.Title = val; } },
             };
 
-        static readonly Dictionary<string, Action<Track, Index>> TrackIndexCommands =
+        private static readonly Dictionary<string, Action<Track, Index>> TrackIndexCommands =
             new Dictionary<string, Action<Track, Index>>
             {
                 { "INDEX", (track, index) => track.Indexes.Add(index) },
                 { "POSTGAP", (track, index) => { track.PostGap = index; } },
                 { "PREGAP", (track, index) => { track.PreGap = index; } },
             };
-        static readonly Dictionary<string, Action<Track, string>> TrackSingleValueCommands =
+
+        private static readonly Dictionary<string, Action<Track, string>> TrackSingleValueCommands =
             new Dictionary<string, Action<Track, string>>
             {
                 { "FLAGS", (sheet, val) => { sheet.Flags = val; } },
@@ -40,8 +34,9 @@ namespace TED.Models.CueSheet.Parsers
                 { "TITLE", (sheet, val) => { sheet.Title = val; } },
             };
 
-        readonly List<string> _cueLines;
-        CueSheet _cueSheet;
+        private readonly List<string> _cueLines;
+
+        private CueSheet _cueSheet;
 
         public CueSheetParser(string fileName, Encoding encoding)
         {
@@ -78,7 +73,7 @@ namespace TED.Models.CueSheet.Parsers
             return _cueSheet;
         }
 
-        void CleanLines()
+        private void CleanLines()
         {
             for (int i = _cueLines.Count; i-- > 0;)
             {
@@ -89,12 +84,12 @@ namespace TED.Models.CueSheet.Parsers
             }
         }
 
-        bool IsStandard()
+        private bool IsStandard()
         {
             return _cueLines.Select(l => new FileLine(l)).Count(line => line.Command == "FILE") == 1;
         }
 
-        bool IsNoncompliant()
+        private bool IsNoncompliant()
         {
             for (int i = 0; i < _cueLines.Count; i++)
             {
@@ -131,7 +126,7 @@ namespace TED.Models.CueSheet.Parsers
             return false;
         }
 
-        void ParseNonstandardFile()
+        private void ParseNonstandardFile()
         {
             ParseRootCommands();
 
@@ -139,7 +134,7 @@ namespace TED.Models.CueSheet.Parsers
 
             ParseTrackCommands(tracks);
 
-            if (_cueSheet.Files.Count != tracks.Count) 
+            if (_cueSheet.Files.Count != tracks.Count)
                 throw new Exception("File count and track count don't match. Maybe file contains tracks that aren't AUDIO?");
 
             for (int i = 0; i < _cueSheet.Files.Count; ++i)
@@ -148,7 +143,7 @@ namespace TED.Models.CueSheet.Parsers
             }
         }
 
-        void ParseRootCommands()
+        private void ParseRootCommands()
         {
             bool atFileSection = false;
 
@@ -157,59 +152,59 @@ namespace TED.Models.CueSheet.Parsers
                 switch (fileLine.Command)
                 {
                     case "REM GENRE":
-                    {
-                        _cueSheet.Genre = fileLine.RawParts.Skip(2).ToCsv(" ");
-                        break;
-                    }
+                        {
+                            _cueSheet.Genre = fileLine.RawParts.Skip(2).ToCsv(" ");
+                            break;
+                        }
                     case "REM DATE":
-                    {
-                        _cueSheet.Date = fileLine.RawParts.Skip(2).ToCsv(" ");
-                        break;
-                    }
+                        {
+                            _cueSheet.Date = fileLine.RawParts.Skip(2).ToCsv(" ");
+                            break;
+                        }
                     case "REM DISCID":
-                    {
-                        _cueSheet.DiscId = fileLine.RawParts.Skip(2).ToCsv(" ");
-                        break;
-                    }
+                        {
+                            _cueSheet.DiscId = fileLine.RawParts.Skip(2).ToCsv(" ");
+                            break;
+                        }
                     case "REM COMMENT":
-                    {
-                        _cueSheet.Comments.Add(new FileLineCommentParser(fileLine).Parse());
-                        break;
-                    }
+                        {
+                            _cueSheet.Comments.Add(new FileLineCommentParser(fileLine).Parse());
+                            break;
+                        }
                     case "REM DISCNUMBER":
-                    {
-                        _cueSheet.DiscNumber = SafeParser.ToNumber<int?>(fileLine.RawParts.Skip(2).ToCsv(" "));
-                        break;
-                    }
+                        {
+                            _cueSheet.DiscNumber = SafeParser.ToNumber<int?>(fileLine.RawParts.Skip(2).ToCsv(" "));
+                            break;
+                        }
                     case "REM TOTALDISCS":
-                    {
-                        _cueSheet.DiscTotal = SafeParser.ToNumber<int?>(fileLine.RawParts.Skip(2).ToCsv(" "));
-                        break;
-                    }
+                        {
+                            _cueSheet.DiscTotal = SafeParser.ToNumber<int?>(fileLine.RawParts.Skip(2).ToCsv(" "));
+                            break;
+                        }
                     case "CATALOG":
                     case "CDTEXTFILE":
                     case "PERFORMER":
                     case "SONGWRITER":
                     case "TITLE":
-                    {
-                        if (atFileSection) break;
+                        {
+                            if (atFileSection) break;
 
-                        CueSheetSingleValueCommands[fileLine.Command](
-                            _cueSheet,
-                            new FileLineSingleValueParser(fileLine).Parse());
-                        break;
-                    }
+                            CueSheetSingleValueCommands[fileLine.Command](
+                                _cueSheet,
+                                new FileLineSingleValueParser(fileLine).Parse());
+                            break;
+                        }
                     case "FILE":
-                    {
-                        atFileSection = true;
-                        _cueSheet.Files.Add(new FileLineFileParser(fileLine).Parse());
-                        break;
-                    }
+                        {
+                            atFileSection = true;
+                            _cueSheet.Files.Add(new FileLineFileParser(fileLine).Parse());
+                            break;
+                        }
                 }
             }
         }
 
-        void ParseStandardFile()
+        private void ParseStandardFile()
         {
             ParseRootCommands();
 
@@ -218,7 +213,7 @@ namespace TED.Models.CueSheet.Parsers
             ParseTrackCommands(file.Tracks);
         }
 
-        void ParseTrackCommands(ICollection<Track> tracks)
+        private void ParseTrackCommands(ICollection<Track> tracks)
         {
             for (int i = 0; i < _cueLines.Count; ++i)
             {
@@ -227,44 +222,44 @@ namespace TED.Models.CueSheet.Parsers
                 switch (fileLine.Command)
                 {
                     case "TRACK":
-                    {
-                        Track track = new FileLineTrackParser(fileLine).Parse();
-
-                        if (track.TrackType != "AUDIO") continue;
-
-                        tracks.Add(track);
-                        
-                        foreach (var trackLine in _cueLines.Skip(i + 1)
-                                                           .Select(line => new FileLine(line))
-                                                           .TakeWhile(line => line.Command != "TRACK"))
                         {
-                            switch (trackLine.Command)
+                            Track track = new FileLineTrackParser(fileLine).Parse();
+
+                            if (track.TrackType != "AUDIO") continue;
+
+                            tracks.Add(track);
+
+                            foreach (var trackLine in _cueLines.Skip(i + 1)
+                                                               .Select(line => new FileLine(line))
+                                                               .TakeWhile(line => line.Command != "TRACK"))
                             {
-                                case "FLAGS":
-                                case "ISRC":
-                                case "PERFORMER":
-                                case "SONGWRITER":
-                                case "TITLE":
+                                switch (trackLine.Command)
                                 {
-                                    TrackSingleValueCommands[trackLine.Command](
-                                        track,
-                                        new FileLineSingleValueParser(trackLine).Parse());
-                                    break;
-                                }
-                                case "INDEX":
-                                case "POSTGAP":
-                                case "PREGAP":
-                                {
-                                    TrackIndexCommands[trackLine.Command](
-                                        track,
-                                        new FileLineIndexParser(trackLine).Parse());
-                                    break;
+                                    case "FLAGS":
+                                    case "ISRC":
+                                    case "PERFORMER":
+                                    case "SONGWRITER":
+                                    case "TITLE":
+                                        {
+                                            TrackSingleValueCommands[trackLine.Command](
+                                                track,
+                                                new FileLineSingleValueParser(trackLine).Parse());
+                                            break;
+                                        }
+                                    case "INDEX":
+                                    case "POSTGAP":
+                                    case "PREGAP":
+                                        {
+                                            TrackIndexCommands[trackLine.Command](
+                                                track,
+                                                new FileLineIndexParser(trackLine).Parse());
+                                            break;
+                                        }
                                 }
                             }
-                        }
 
-                        break;
-                    }
+                            break;
+                        }
                 }
             }
         }

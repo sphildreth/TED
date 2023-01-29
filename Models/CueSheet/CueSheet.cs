@@ -35,7 +35,9 @@
         public string Date { get; internal set; }
 
         public string DiscId { get; internal set; }
+
         public int? DiscNumber { get; internal set; }
+
         public int? DiscTotal { get; internal set; }
 
         public bool TryGetCommentValue(string name, out string value)

@@ -1,13 +1,8 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using TED.Models.CueSheet;
-
-
-namespace TED.Models.CueSheet
+﻿namespace TED.Models.CueSheet
 {
     public class Track
     {
-        readonly List<Index> _indexes = new List<Index>();
+        private readonly List<Index> _indexes = new List<Index>();
 
         public string Flags { get; set; }
 

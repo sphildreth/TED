@@ -24,6 +24,5 @@ namespace TED.Models
         public DataToken()
         {
         }
-
     }
 }

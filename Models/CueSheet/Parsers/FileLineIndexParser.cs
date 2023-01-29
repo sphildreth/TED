@@ -1,15 +1,9 @@
-﻿using System;
-using System.Linq;
-using TED.Models.CueSheet;
-using TED.Models.CueSheet.Parsers;
-
-
-namespace TED.Models.CueSheet.Parsers
+﻿namespace TED.Models.CueSheet.Parsers
 {
     public class FileLineIndexParser : IParser<Index>
     {
-        readonly FileLine _line;
-        
+        private readonly FileLine _line;
+
         public FileLineIndexParser(FileLine line)
         {
             if (line == null)

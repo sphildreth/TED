@@ -1,6 +1,5 @@
 using NodaTime;
 using System.ComponentModel.DataAnnotations;
-using System.Reflection.Metadata.Ecma335;
 using System.Text.Json.Serialization;
 using TED.Enums;
 using TED.Extensions;
@@ -11,7 +10,7 @@ namespace TED.Models.MetaData
     public class Release : MetaDataBase
     {
         public Release()
-            :this(null, null)
+            : this(null, null)
         {
         }
 
@@ -22,7 +21,7 @@ namespace TED.Models.MetaData
 
         public override string ToString()
         {
-            return $"Status [{Status}] Directory [{ Directory }]";
+            return $"Status [{Status}] Directory [{Directory}]";
         }
 
         public DataToken? Artist { get; set; }
@@ -82,7 +81,8 @@ namespace TED.Models.MetaData
 
         public DataToken? ReleaseData { get; set; }
 
-        string? _releaseDate;
+        private string? _releaseDate;
+
         public string? ReleaseDate
         {
             get

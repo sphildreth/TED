@@ -52,7 +52,6 @@
             };
         }
 
-
         public static ProcessMessage MakeWarningMessage(string message)
         {
             return new ProcessMessage
@@ -61,7 +60,5 @@
                 StatusIndicator = Warning
             };
         }
-
-
     }
 }

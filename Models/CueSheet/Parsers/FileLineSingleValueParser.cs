@@ -1,17 +1,12 @@
-using System;
-using TED.Models.CueSheet;
-using TED.Models.CueSheet.Parsers;
-
-
 namespace TED.Models.CueSheet.Parsers
 {
     public class FileLineSingleValueParser : IParser<string>
     {
-        readonly FileLine _line;
+        private readonly FileLine _line;
 
         public FileLineSingleValueParser(FileLine line)
         {
-            if (line == null) 
+            if (line == null)
                 throw new ArgumentNullException("line");
 
             _line = line;

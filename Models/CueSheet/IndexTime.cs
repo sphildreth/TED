@@ -1,15 +1,14 @@
-﻿using System;
-
-
-namespace TED.Models.CueSheet
+﻿namespace TED.Models.CueSheet
 {
     public class IndexTime
     {
-        const decimal FrameInMs = 13.333333333333333333333333333M;
+        private const decimal FrameInMs = 13.333333333333333333333333333M;
 
-        readonly byte _minutes;
-        readonly byte _seconds;
-        readonly byte _frames;
+        private readonly byte _minutes;
+
+        private readonly byte _seconds;
+
+        private readonly byte _frames;
 
         public IndexTime(string time)
         {
