@@ -102,6 +102,19 @@ namespace TED.Processors
                 if (allfileAtlsFound.Any(x => x.AudioFormat.ID > -1))
                 {
                     var tagsFilesFound = allfileAtlsFound.Where(x => x.AudioFormat.ID > -1 && x.Duration > 0);
+                    var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => !string.Equals(x.AudioFormat.ShortName, "mpeg", StringComparison.OrdinalIgnoreCase));
+                    if (doesReleaseHaveNonMp3Tracks)
+                    {
+                        var cueCheckResult = await CheckIfDirectoryHasCueFile(dir);
+                        if (cueCheckResult.Item1)
+                        {
+                            tagsFilesFound = cueCheckResult.Item2;
+                        }
+                        else
+                        {
+                            tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound);
+                        }
+                    }
                     var filesAtlsGroupedByRelease = tagsFilesFound.GroupBy(x => x.Album);
                     foreach (var groupedByRelease in filesAtlsGroupedByRelease)
                     {
@@ -181,12 +194,6 @@ namespace TED.Processors
                             };
                             releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : Statuses.Incomplete;
                             releaseData.ProcessingMessages.Add(new ProcessMessage("CoverImage not found.", false, ProcessMessage.BadCheckMark));
-                        }
-                        var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => !string.Equals(x.AudioFormat.ShortName, "mpeg", StringComparison.OrdinalIgnoreCase));
-                        if (doesReleaseHaveNonMp3Tracks)
-                        {
-                            await CheckIfDirectoryHasCueFile(dir);
-                            tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound);
                         }
                         var medias = new List<ReleaseMedia>();
                         foreach (var mp3TagData in tagsFilesFound.GroupBy(x => x.DiscNumber))
@@ -376,8 +383,9 @@ namespace TED.Processors
             return release;
         }
 
-        private async Task CheckIfDirectoryHasCueFile(string dir)
+        private async Task<(bool, IEnumerable<ATL.Track>)> CheckIfDirectoryHasCueFile(string dir)
         {
+            var result = new ConcurrentBag<ATL.Track>();
             var isrcCueSheets = Directory.GetFiles(dir, "*.cue");
             if (isrcCueSheets.Any())
             {
@@ -424,7 +432,8 @@ namespace TED.Processors
                         var fileAtl = new ATL.Track(split.FilePath);
                         fileAtl.Album = theReader.Title ?? throw new Exception("Invalid Release Title");
                         fileAtl.AlbumArtist = releaseArtist;
-                        fileAtl.Comment = "";
+                        fileAtl.Comment = string.Empty;
+                        fileAtl.DiscNumber = 1; // I think in a multi-media release with CUE each media gets it own CUE? See https://wiki.hydrogenaud.io/index.php?title=Cue_sheet
                         var readerTrack = theReader.Tracks.FirstOrDefault(x => x.TrackNumber == split.Track.TrackNum) ?? throw new Exception("Unable to find Track for file");
                         fileAtl.Title = readerTrack.Title ?? throw new Exception("Invalid Track Title");
                         fileAtl.TrackNumber = readerTrack.TrackNumber;
@@ -444,6 +453,7 @@ namespace TED.Processors
                         {
                             throw new Exception($"Unable to update metadata for file [{fileAtl.FileInfo().FullName}]");
                         }
+                        result.Add(new ATL.Track(split.FilePath));
                     });
                     foreach(var cueFile in cueSheet.Files)
                     {
@@ -453,8 +463,10 @@ namespace TED.Processors
                     }
                     File.SetAttributes(CUEFileForReleaseDirectory, FileAttributes.Normal);
                     File.Delete(CUEFileForReleaseDirectory);
+                    return (true, result);
                 }
             }
+            return (false, null);
         }
 
         public async Task CheckIfDirectoryHasMultipleReleases(DateTime now, string? dir)
@@ -865,7 +877,7 @@ namespace TED.Processors
             {
                 return false;
             }
-            return Regex.IsMatch(dir, $"(\\s*CD.*[0-9]+)", RegexOptions.IgnoreCase);
+            return Regex.IsMatch(dir, $"(\\s*CD[.\\S]*[0-9]+)", RegexOptions.IgnoreCase);
         }
 
         public static void DeleteDirectory(string target_dir)

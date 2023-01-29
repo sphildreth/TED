@@ -402,7 +402,7 @@
             {
                 logger.LogDebug("Scanning [{ folder }]", dir);
                 StagingRelease? releaseForDirectory = null;
-                var filesInDirectory = Directory.GetFiles(dir);
+                var filesInDirectory = Directory.GetFiles(dir, "*.*", SearchOption.TopDirectoryOnly);
                 if (filesInDirectory.Any())
                 {
                     releaseForDirectory = (await directoryProcessor.ProcessAsync(now, dir, filesInDirectory)).Adapt<StagingRelease>();
