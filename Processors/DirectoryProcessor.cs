@@ -641,7 +641,7 @@ namespace TED.Processors
             var secondaryReleaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
             if (secondaryReleaseImagesInDirectory?.Any() ?? false)
             {
-                if (!IsImageAProofType(releaseImagesInDirectory.First()))
+                if (!IsImageAProofType(secondaryReleaseImagesInDirectory.First()))
                 {
                     return (new Image
                     {
@@ -653,7 +653,7 @@ namespace TED.Processors
             var releaseImagesInParentDirectory = ImageHelper.FindImageTypeInDirectory(directoryInfo.Parent, ImageType.Release, SearchOption.TopDirectoryOnly);
             if (releaseImagesInParentDirectory?.Any() ?? false)
             {
-                if (!IsImageAProofType(releaseImagesInDirectory.First()))
+                if (!IsImageAProofType(releaseImagesInParentDirectory.First()))
                 {
                     return (new Image
                     {
