@@ -53,11 +53,15 @@ namespace TED.Utility
                 var i = input as string ?? input.ToString();
                 if (!string.IsNullOrEmpty(i))
                 {
-                    if (Regex.IsMatch(i, @"([0-9]{4}).+([0-9]{4})")) i = i.Substring(0, 4);
+                    if (Regex.IsMatch(i, @"([0-9]{4}).+([0-9]{4})"))
+                    {
+                        i = i.Substring(0, 4);
+                    }
                     i = Regex.Replace(i, @"(\\)", "/");
                     i = Regex.Replace(i, @"(;)", "/");
                     i = Regex.Replace(i, @"(\/+)", "/");
                     i = Regex.Replace(i, @"(-+)", "/");
+                    i = i.Replace("\"", string.Empty);
                     var parts = i.Contains("/") ? i.Split('/').ToList() : new List<string> { i };
                     if (parts.Count == 2)
                         if (parts[0] != null && parts[1] != null && parts[0] == parts[1])

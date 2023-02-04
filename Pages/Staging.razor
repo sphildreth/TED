@@ -427,30 +427,47 @@
                 }
                 foreach (var subDir in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
                 {
-                    string[] filesForDirectory = new string[0];
-                    var subDirInfo = new DirectoryInfo(subDir);
-                    if (DirectoryProcessor.IsDirectoryMediaDirectory(subDir))
-                    {
-                        DirectoryProcessor.ProcessSubDirectory(dir, subDirInfo, _directoryProcessorLogger);
-                        continue;
-                    }
-                    var subDirs = subDirInfo.GetDirectories();
-                    var subDirHasCoverSubDirectory = subDirs.Count() == 1 && subDirs.Any(x => DirectoryProcessor.IsCoverImagesDirectory(x.Name));
-                    if (!subDirInfo.EnumerateDirectories().Any() || subDirHasCoverSubDirectory)
-                    {
-                        filesForDirectory = Directory.GetFiles(subDir);
-                    }
+                    //string[] filesForDirectory = new string[0];
+                    //var subDirInfo = new DirectoryInfo(subDir);
+                    //if (DirectoryProcessor.IsDirectoryMediaDirectory(dir, subDir))
+                    //{
+                    //    DirectoryProcessor.ProcessSubDirectory(dir, subDirInfo, _directoryProcessorLogger);
+                    //    continue;
+                    //}
+                    //var subDirs = subDirInfo.GetDirectories();
+                    //var subDirHasCoverSubDirectory = subDirs.Count() == 1 && subDirs.Any(x => DirectoryProcessor.IsCoverImagesDirectory(x.Name));
+                    //if (!subDirInfo.EnumerateDirectories().Any() || subDirHasCoverSubDirectory)
+                    //{
+                    //    filesForDirectory = Directory.GetFiles(subDir);
+                    //}
+                    //logger.LogDebug("Scanning [{ folder }] Directory [{ subDir }]", dir, subDir);
+                    //releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, filesForDirectory)).Adapt<StagingRelease>();
+                    //if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
+                    //{
+                    //    releaseForDirectory.Selected = releaseForDirectory.IsValid;
+                    //    _releases.Add(releaseForDirectory);
+                    //    sw.Stop();
+                    //    StateHasChanged();
+                    //    logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
+                    //    sw.Restart();
+                    //}
+
                     logger.LogDebug("Scanning [{ folder }] Directory [{ subDir }]", dir, subDir);
-                    releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, filesForDirectory)).Adapt<StagingRelease>();
-                    if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
+                    if(DirectoryProcessor.ProcessSubDirectory(dir, new DirectoryInfo(subDir), _directoryProcessorLogger))
                     {
-                        releaseForDirectory.Selected = releaseForDirectory.IsValid;
-                        _releases.Add(releaseForDirectory);
-                        sw.Stop();
-                        StateHasChanged();
-                        logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
-                        sw.Restart();
+                        releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, Directory.GetFiles(subDir))).Adapt<StagingRelease>();
+                        if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
+                        {
+                            releaseForDirectory.Selected = releaseForDirectory.IsValid;
+                            _releases.Add(releaseForDirectory);
+                            sw.Stop();
+                            StateHasChanged();
+                            logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
+                            sw.Restart();
+                        }
+
                     }
+
                 }
                 _processingDirectoryProgress++;
             }

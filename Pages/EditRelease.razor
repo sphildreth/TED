@@ -219,12 +219,16 @@
         DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true };
 
         var dialog = await DialogService.ShowAsync<RemoveTextFromTrackTitleDialog>("Enter text to remove", 
-            new DialogParameters { ["TextToRemove"] = _release.Media.First().Tracks.First().Title },
+            new DialogParameters 
+            { 
+                ["TextToRemove"] = _release.Media.First().Tracks.First().Title 
+            },
             closeOnEscapeKey);
         var result = await dialog.Result;
         if (!result.Canceled)
         {
-            _releaseEditProcessor.RemoveTextFromTracks(_release, result.Data as string);
+            var d = result.Data as string[];
+            _releaseEditProcessor.ReplaceTextFromTracks(_release, d[0], d[1]);
         }
 
     }

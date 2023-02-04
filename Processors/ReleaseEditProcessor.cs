@@ -216,9 +216,9 @@ namespace TED.Processors
             release.Media = medias;
         }
 
-        public void RemoveTextFromTracks(Release release, string text)
+        public void ReplaceTextFromTracks(Release release, string textToReplace, string textToReplaceWith)
         {
-            if (text.Nullify() == null)
+            if (textToReplace.Nullify() == null)
             {
                 return;
             }
@@ -230,7 +230,7 @@ namespace TED.Processors
                 {
                     if (track.Title.Nullify() != null)
                     {
-                        track.Title = track.Title.Replace(text, string.Empty).Trim();
+                        track.Title = track.Title.Replace(textToReplace, textToReplaceWith).Trim();
                     }
                 }
                 media.Tracks = tracks;

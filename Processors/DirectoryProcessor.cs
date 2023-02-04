@@ -520,9 +520,10 @@ namespace TED.Processors
         public static bool ProcessSubDirectory(string releaseDirectory, DirectoryInfo subDirectory, ILogger logger)
         {
             var processingFoundNewFiles = false;
-            if (IsDirectoryMediaDirectory(subDirectory.FullName))
+            var subDirectoryFiles = subDirectory.GetFiles("*.*", SearchOption.TopDirectoryOnly);
+            // If the subdir is a media folder (like "CD01") then move the media files from the sub directory up one with media name
+            if (IsDirectoryMediaDirectory(releaseDirectory, subDirectory.FullName))
             {
-                var subDirectoryFiles = subDirectory.GetFiles("*.*", SearchOption.TopDirectoryOnly);
                 if (subDirectoryFiles.Any())
                 {
                     Parallel.ForEach(subDirectoryFiles, subDirectoryFile =>
@@ -572,6 +573,10 @@ namespace TED.Processors
                 //    DeleteDirectory(subDirectory.FullName);
                 //}
             }
+            else
+            {
+                processingFoundNewFiles = subDirectoryFiles.Any();
+            }
             return processingFoundNewFiles;
         }
 
@@ -606,32 +611,55 @@ namespace TED.Processors
             return (null, 0, 0);
         }
 
+        public static bool IsImageAProofType(FileInfo? imageInfo)
+        {
+            if(imageInfo == null)
+            {
+                return false;
+            }
+            var imageName = Path.GetFileNameWithoutExtension(imageInfo.Name);
+            if(imageName.EndsWith("proof", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return false;
+        }
+
         private async Task<(Image?, int, int)> FirstReleaseImageInDirectory(string dir, string? releaseTitle, string[] filesInDirectory)
         {
             var releaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Release, SearchOption.TopDirectoryOnly);
             if (releaseImagesInDirectory?.Any() ?? false)
             {
-                return (new Image
+                if (!IsImageAProofType(releaseImagesInDirectory.First()))
                 {
-                    Bytes = await File.ReadAllBytesAsync(releaseImagesInDirectory.First().FullName)
-                }, releaseImagesInDirectory.Count(), 0);
+                    return (new Image
+                    {
+                        Bytes = await File.ReadAllBytesAsync(releaseImagesInDirectory.First().FullName)
+                    }, releaseImagesInDirectory.Count(), 0);
+                }
             }
             var secondaryReleaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
             if (secondaryReleaseImagesInDirectory?.Any() ?? false)
             {
-                return (new Image
+                if (!IsImageAProofType(releaseImagesInDirectory.First()))
                 {
-                    Bytes = await File.ReadAllBytesAsync(secondaryReleaseImagesInDirectory.First().FullName)
-                }, 0, secondaryReleaseImagesInDirectory.Count());
+                    return (new Image
+                    {
+                        Bytes = await File.ReadAllBytesAsync(secondaryReleaseImagesInDirectory.First().FullName)
+                    }, 0, secondaryReleaseImagesInDirectory.Count());
+                }
             }
             var directoryInfo = new DirectoryInfo(dir);
             var releaseImagesInParentDirectory = ImageHelper.FindImageTypeInDirectory(directoryInfo.Parent, ImageType.Release, SearchOption.TopDirectoryOnly);
             if (releaseImagesInParentDirectory?.Any() ?? false)
             {
-                return (new Image
+                if (!IsImageAProofType(releaseImagesInDirectory.First()))
                 {
-                    Bytes = await File.ReadAllBytesAsync(releaseImagesInParentDirectory.First().FullName)
-                }, releaseImagesInDirectory.Count(), 0);
+                    return (new Image
+                    {
+                        Bytes = await File.ReadAllBytesAsync(releaseImagesInParentDirectory.First().FullName)
+                    }, releaseImagesInDirectory.Count(), 0);
+                }
             }
 
             try
@@ -650,7 +678,7 @@ namespace TED.Processors
                         foundImageFileName = allImagesInDirectory.FirstOrDefault(x => x.ToAlphanumericName().Contains(releaseTitle.ToAlphanumericName()));
                     }
                 }
-                if (foundImageFileName != null)
+                if (foundImageFileName != null && !IsImageAProofType(new FileInfo(foundImageFileName)))
                 {
                     return (new Image
                     {
@@ -900,11 +928,20 @@ namespace TED.Processors
             return Regex.IsMatch(dir, $"cover(s*)|scans", RegexOptions.IgnoreCase);
         }
 
-        public static bool IsDirectoryMediaDirectory(string dir)
+        public static bool IsDirectoryMediaDirectory(string? releaseDirectory, string dir)
         {
             if (dir.Nullify() == null)
             {
                 return false;
+            }
+            if (releaseDirectory.Nullify() != null)
+            {
+                var rdDir = new DirectoryInfo(releaseDirectory);
+                var dirDir = new DirectoryInfo(dir);
+                if (Fastenshtein.Levenshtein.Distance(rdDir.Name, dirDir.Name) < 15)
+                {
+                    return true;
+                }
             }
             return Regex.IsMatch(dir, $"(\\s*(CD[.\\S]*[0-9])|(CD\\s[0-9])+)", RegexOptions.IgnoreCase);
         }
