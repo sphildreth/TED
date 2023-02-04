@@ -56,7 +56,7 @@ namespace TED.Processors
             {
                 if (ProcessSubDirectory(dir, new DirectoryInfo(subDir), _logger))
                 {
-                    filesInDirectory = Directory.GetFiles(subDir);
+                    filesInDirectory = Directory.GetFiles(dir);
                 }
             }
             if (!filesInDirectory.Any())
