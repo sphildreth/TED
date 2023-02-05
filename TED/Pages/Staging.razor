@@ -27,7 +27,7 @@
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.TrackCount < 4, true))">Less than 3 Tracks</MudMenuItem>
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status != Enums.Statuses.Ok, false))">Needs Attention</MudMenuItem>
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status == Enums.Statuses.Ok, true))">Ready to Move</MudMenuItem>
-        <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.DurationMinutes <= 10, true))">Under 10 Minutes</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.DurationMinutes <= 12, true))">Under 12 Minutes</MudMenuItem>
     </MudMenu>
     <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SelectAll" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Select">
         <MudMenuItem OnClick="@( (e) => ToggleSelected(true))">Select All</MudMenuItem>
@@ -443,7 +443,7 @@
                     if (_releases.Count() >= StagingDirectoryScanLimit)
                     {
                         Snackbar.Add($"Reached maximum Directory scan limit of [{StagingDirectoryScanLimit}]", MudBlazor.Severity.Info);
-                        return;
+                        break;
                     }
                 }
                 foreach (var subDir in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
@@ -465,7 +465,7 @@
                     if (_releases.Count() >= StagingDirectoryScanLimit)
                     {
                         Snackbar.Add($"Reached maximum Directory scan limit of [{StagingDirectoryScanLimit}]", MudBlazor.Severity.Info);
-                        return;
+                        break;
                     }
                 }
                 _processingDirectoryProgress++;

@@ -5,13 +5,20 @@ Tag EDitor for MP3 files.
 TED is a ID3 tag editor for bulk editing MP3 files. 
 NOTE: TED is early in development and very much a work in progress. 
 
+Built on:
+---------
+* [.Net Core](https://docs.microsoft.com/en-us/dotnet/core/)
+* [Audio Tools Library (ATL) for .NET](https://github.com/Zeugma440/atldotnet)
+* [Blazor Server](https://dotnet.microsoft.com/en-us/apps/aspnet/web-apps/blazor)
+* [MudBlazor](https://mudblazor.com/)
+
 Core Features:
 ---------
 * Batch select of Releases to move into Inbound (or Library) Directory
 * Batch delete of selected Releases
 * Checks Release Track count against SFV and M3U files
 * Converts FLAC files to MP3 files
-* Created JSON metadata file for each Release
+* Creates JSON metadata file for each Release (ted.data.json)
 * Find all Releases (or Albums) recursively in a directory
 * Remove unwanted text from Track Titles 
 * Removes featuring artist from Track Title and puts as Track Artist

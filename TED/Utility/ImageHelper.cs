@@ -42,7 +42,7 @@ namespace TED.Utility
             }
 
             return Regex.IsMatch(fileinfo.Name,
-                                @"(band|artist|group|photo)\.(jpg|jpeg|png|bmp|gif)",
+                                @"(band|artist|group|photo)(.*[0-9]*.*)*\.(jpg|jpeg|png|bmp|gif)",
                                 RegexOptions.IgnoreCase);
         }
 

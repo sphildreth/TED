@@ -6,12 +6,10 @@ using System.Text.RegularExpressions;
 using TED.Enums;
 using TED.Extensions;
 using TED.Models;
-using cue = TED.Models.CueSheet;
 using TED.Models.CueSheet.Parsers;
 using TED.Models.MetaData;
 using TED.Utility;
-using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Razor.Hosting;
+using cue = TED.Models.CueSheet;
 
 namespace TED.Processors
 {
@@ -19,7 +17,7 @@ namespace TED.Processors
     {
         public const int MaximumDiscNumber = 500;
 
-        public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web|\(320\))+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web|\(320\)|\(*compilation\)*)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static readonly Regex UnwantedTrackTitleTextRegex = new(@"(\s{2,}|(\s\(prod\s))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -164,7 +162,7 @@ namespace TED.Processors
                         }
                         else
                         {
-                            var artistThumbnailData = await FirstArtistImageInDirectory(dir, filesInDirectory);
+                            var artistThumbnailData = await FirstArtistImageInDirectory(dir, releaseData.Artist?.Text, filesInDirectory, _logger);
                             releaseData.ArtistThumbnail = artistThumbnailData.Item1;
                             releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{artistThumbnailData.Item2}] number of Artist images.", artistThumbnailData.Item2 > 0, artistThumbnailData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
                         }
@@ -181,7 +179,7 @@ namespace TED.Processors
                         }
                         else
                         {
-                            var releaseCoverImageData = await FirstReleaseImageInDirectory(dir, releaseData.ReleaseData.Text, filesInDirectory);
+                            var releaseCoverImageData = await FirstReleaseImageInDirectory(dir, releaseData.ReleaseData?.Text, filesInDirectory, _logger);
                             releaseData.CoverImage = releaseCoverImageData.Item1;
                             releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{releaseCoverImageData.Item2}] number of Release images.", releaseCoverImageData.Item2 > 0, releaseCoverImageData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
                         }
@@ -388,7 +386,7 @@ namespace TED.Processors
             var isrcCueSheets = Directory.GetFiles(dir, "*.cue");
             if (isrcCueSheets.Any())
             {
-                foreach(var isrc in isrcCueSheets)
+                foreach (var isrc in isrcCueSheets)
                 {
                     if (isrc.Contains("isrc.cue", StringComparison.OrdinalIgnoreCase))
                     {
@@ -464,7 +462,7 @@ namespace TED.Processors
                         }
                         result.Add(new ATL.Track(split.FilePath));
                     });
-                    foreach(var cueFile in cueSheet.Files)
+                    foreach (var cueFile in cueSheet.Files)
                     {
                         var fn = Path.Combine(dir, cueFile.FileName);
                         if (File.Exists(fn))
@@ -534,13 +532,13 @@ namespace TED.Processors
                             try
                             {
                                 var mediaNumber = fileAtl.DiscNumber ?? DetermineMediaNumberFromDirectory(subDirectory.Name);
-                                if((mediaNumber ?? 0) < 1)
+                                if ((mediaNumber ?? 0) < 1)
                                 {
                                     mediaNumber = 1;
                                 }
                                 File.SetAttributes(subDirectoryFile.FullName, FileAttributes.Normal);
                                 var newMediaFileName = Path.Combine(subDirectory.Parent.FullName, $"m{mediaNumber.ToStringPadLeft(3)} {subDirectoryFile.Name}");
-                                subDirectoryFile.MoveTo(newMediaFileName);
+                                subDirectoryFile.MoveTo(newMediaFileName, true);
                             }
                             catch (Exception ex)
                             {
@@ -568,10 +566,11 @@ namespace TED.Processors
                     });
                     processingFoundNewFiles = true;
                 }
-                //if(!subDirectory.GetFiles().Any())
-                //{
-                //    DeleteDirectory(subDirectory.FullName);
-                //}
+                if (!subDirectory.EnumerateFiles().Any())
+                {
+                    logger.LogDebug("Deleted SubDirectory [{ subDirectory }]", subDirectory.FullName);
+                    DeleteDirectory(subDirectory.FullName);
+                }
             }
             else
             {
@@ -590,19 +589,49 @@ namespace TED.Processors
             return string.Equals(tracksGroupedByArtist.First().Key, albumArtist) && tracksGroupedByArtist.Count() == 1;
         }
 
-        private static async Task<(Image?, int, int)> FirstArtistImageInDirectory(string dir, string[] filesInDirectory)
+        private static async Task<(Image?, int, int)> FirstArtistImageInDirectory(string dir, string? artistName, string[] filesInDirectory, ILogger logger)
         {
-            var artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Artist, SearchOption.TopDirectoryOnly);
+            if (dir.Nullify() == null)
+            {
+                return (null, 0, 0);
+            }
+            var dirInfo = new DirectoryInfo(dir);
+            var artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo, ImageType.Artist, SearchOption.TopDirectoryOnly);
             if (artistImagesInDirectory?.Any() ?? false)
             {
+                logger.LogDebug("Found Artist image [{artistImage}]", artistImagesInDirectory.First().FullName);
                 return (new Image
                 {
                     Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
                 }, artistImagesInDirectory.Count(), 0);
             }
-            var secondaryArtistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.ArtistSecondary, SearchOption.TopDirectoryOnly);
+            // See if parent folder has artist image
+            artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo.Parent, ImageType.Artist, SearchOption.TopDirectoryOnly);
+            if (artistImagesInDirectory?.Any() ?? false)
+            {
+                logger.LogDebug("Found Artist image [{artistImage}]", artistImagesInDirectory.First().FullName);
+                return (new Image
+                {
+                    Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
+                }, artistImagesInDirectory.Count(), 0);
+            }
+            var parentCoversFolder = new DirectoryInfo(Path.Combine(dirInfo.Parent.FullName, "Covers"));
+            if (parentCoversFolder.Exists)
+            {
+                artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(parentCoversFolder, ImageType.Artist, SearchOption.TopDirectoryOnly);
+                if (artistImagesInDirectory?.Any() ?? false)
+                {
+                    logger.LogDebug("Found Artist image [{artistImage}]", artistImagesInDirectory.First().FullName);
+                    return (new Image
+                    {
+                        Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
+                    }, artistImagesInDirectory.Count(), 0);
+                }
+            }
+            var secondaryArtistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo, ImageType.ArtistSecondary, SearchOption.TopDirectoryOnly);
             if (secondaryArtistImagesInDirectory?.Any() ?? false)
             {
+                logger.LogDebug("Found Secondary Artist image [{artistImage}]", secondaryArtistImagesInDirectory.First().FullName);
                 return (new Image
                 {
                     Bytes = await File.ReadAllBytesAsync(secondaryArtistImagesInDirectory.First().FullName)
@@ -613,36 +642,43 @@ namespace TED.Processors
 
         public static bool IsImageAProofType(FileInfo? imageInfo)
         {
-            if(imageInfo == null)
+            if (imageInfo == null)
             {
                 return false;
             }
             var imageName = Path.GetFileNameWithoutExtension(imageInfo.Name);
-            if(imageName.EndsWith("proof", StringComparison.OrdinalIgnoreCase))
+            if (imageName.EndsWith("proof", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
             return false;
         }
 
-        private async Task<(Image?, int, int)> FirstReleaseImageInDirectory(string dir, string? releaseTitle, string[] filesInDirectory)
+        private async Task<(Image?, int, int)> FirstReleaseImageInDirectory(string dir, string? releaseTitle, string[] filesInDirectory, ILogger logger)
         {
-            var releaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.Release, SearchOption.TopDirectoryOnly);
+            if (dir.Nullify() == null)
+            {
+                return (null, 0, 0);
+            }
+            var dirInfo = new DirectoryInfo(dir);
+            var releaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo, ImageType.Release, SearchOption.TopDirectoryOnly);
             if (releaseImagesInDirectory?.Any() ?? false)
             {
                 if (!IsImageAProofType(releaseImagesInDirectory.First()))
                 {
+                    logger.LogDebug("Found Release image [{releaseImage}]", releaseImagesInDirectory.First().FullName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(releaseImagesInDirectory.First().FullName)
                     }, releaseImagesInDirectory.Count(), 0);
                 }
             }
-            var secondaryReleaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(dir), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
+            var secondaryReleaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo, ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
             if (secondaryReleaseImagesInDirectory?.Any() ?? false)
             {
                 if (!IsImageAProofType(secondaryReleaseImagesInDirectory.First()))
                 {
+                    logger.LogDebug("Found Secondary Release image [{releaseImage}]", secondaryReleaseImagesInDirectory.First().FullName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(secondaryReleaseImagesInDirectory.First().FullName)
@@ -655,17 +691,26 @@ namespace TED.Processors
             {
                 if (!IsImageAProofType(releaseImagesInParentDirectory.First()))
                 {
+                    logger.LogDebug("Found Release image [{releaseImage}]", releaseImagesInParentDirectory.First().FullName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(releaseImagesInParentDirectory.First().FullName)
                     }, releaseImagesInDirectory.Count(), 0);
                 }
             }
-
             try
             {
                 string foundImageFileName = null;
-                var imagesByReleaseName = Directory.GetFiles(dir, $"{releaseTitle}*.jpg".ToFileNameFriendly());
+                var imagesByReleaseName = Directory.GetFiles(dir, $"{releaseTitle}*.jpg".ToFileNameFriendly()).ToList();
+                var parentCoversFolder = new DirectoryInfo(Path.Combine(dirInfo.Parent.FullName, "Covers"));
+                if (parentCoversFolder.Exists)
+                {
+                    var parentCoversImagesByReleaseName = Directory.GetFiles(parentCoversFolder.FullName, $"{releaseTitle}*.jpg".ToFileNameFriendly());
+                    if (parentCoversImagesByReleaseName.Any())
+                    {
+                        imagesByReleaseName.AddRange(parentCoversImagesByReleaseName);
+                    }
+                }
                 if (imagesByReleaseName?.Any() ?? false)
                 {
                     foundImageFileName = imagesByReleaseName.First();
@@ -680,6 +725,7 @@ namespace TED.Processors
                 }
                 if (foundImageFileName != null && !IsImageAProofType(new FileInfo(foundImageFileName)))
                 {
+                    logger.LogDebug("Found Release image [{releaseImage}]", foundImageFileName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(foundImageFileName)
@@ -693,10 +739,25 @@ namespace TED.Processors
             return (null, 0, 0);
         }
 
+        public static bool ShouldMediaTrackBeConverted(ATL.Track track)
+        {
+            if(track?.AudioFormat == null)
+            {
+                return false;
+            }
+            var shortName = track.AudioFormat.ShortName;
+            if(Regex.IsMatch(shortName, "mpeg([0-9]*)", RegexOptions.IgnoreCase))
+            {
+                return false;
+            }            
+            return true;
+        }
+
+
         private async Task<IEnumerable<ATL.Track>> ConvertToMp3(string dir, IEnumerable<ATL.Track> atlTracks)
         {
             var result = new ConcurrentBag<ATL.Track>();
-            await Parallel.ForEachAsync(atlTracks.Where(x => !string.Equals(x.AudioFormat.ShortName, "mpeg", StringComparison.OrdinalIgnoreCase)), async (atlTrack, cancellationTokenfile) =>
+            await Parallel.ForEachAsync(atlTracks.Where(x => ShouldMediaTrackBeConverted(x)), async (atlTrack, cancellationTokenfile) =>
             {
                 var trackFileInfo = atlTrack.FileInfo();
                 var trackDirectory = trackFileInfo?.Directory?.FullName ?? throw new Exception("Invalid FileInfo For Track");
