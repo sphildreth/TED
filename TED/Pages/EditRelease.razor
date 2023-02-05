@@ -1,0 +1,334 @@
+﻿@page "/editrelease/{releaseDirectory}"
+
+@using TED.Enums;
+@using TED.Extensions;
+@using TED.Models.MetaData;
+@using TED.Processors;
+@using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager NavigationManager
+@inject ILoggerFactory LoggerFactory
+@inject IDialogService DialogService
+
+<PageTitle>Editing Release</PageTitle>
+
+<MudToolBar DisableGutters=true>
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Medium" OnClick="@( async (e) => await DeleteRelease())">Delete</MudButton>
+    <MudButton Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Remove" Color="Color.Warning" Size="Size.Medium" OnClick="@( async (e) => await DeleteReleaseImages())">Delete Release Images</MudButton>
+    <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Menu" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Modify Actions">
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.PromoteTrackArtist(_release))">Promote Track Artist</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Numbers" OnClick="@( (e) => _releaseEditProcessor.RenumberTracks(_release))">Renumber Tracks</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => ReleaseEditProcessor.RemoveArtistFromTrackArtists(_release))">Remove Artist from Track Artists</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.RemoveFeaturingArtistFromTrackTitle(_release))">Remove Featuring Artists from Track Title</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.EditNote" OnClick="@( async (e) => await RemoveTextFromTrackTitles())">Remove text from Track Titles</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => ReleaseEditProcessor.RemoveTrackArtistFromTracks(_release))">Remove Track Artists</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.Person" OnClick="@( (e) => _releaseEditProcessor.ReplaceTracksArtistSeperators(_release))">Replace Track Artist seperators</MudMenuItem>
+        <MudMenuItem Class="ml-3" Icon="@Icons.Material.Filled.CalendarMonth" OnClick="@( (e) => _releaseEditProcessor.SetYearToCurrent(_release))">Set Year To current</MudMenuItem>
+    </MudMenu>
+    <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.EditNote" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Trim Track Titles">
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(1, _release))">1</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(2, _release))">2</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(3, _release))">3</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(4, _release))">4</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => _releaseEditProcessor.TrimTrackTitles(5, _release))">5</MudMenuItem>
+    </MudMenu>
+</MudToolBar>
+
+<div Class="d-flex flex-wrap">
+    <MudText Class="mt-4">Editing Directory: @ReleaseDirectory</MudText>
+    <MudSpacer />
+    <MudBadge Dot="true" Color="@( _release.Status == Enums.Statuses.Ok || _release.Status == Enums.Statuses.Reviewed ? Color.Success : Color.Error )" Class="mx-6 my-4">
+        <MudText>Release Status</MudText>
+    </MudBadge>
+</div>
+
+
+@using FluentValidation
+@using TED.Utility;
+
+<MudGrid>
+    <MudItem xs="8">
+        <MudCard>
+            <MudForm Model="@_release" @ref="@form" Validation="@(releaseValidator.ValidateValue)" ValidationDelay="0">
+                <MudCardContent>
+                    <MudSelect @bind-Value="_release.Status" T="Enums.Statuses" Label="Status" AnchorOrigin="Origin.BottomCenter">
+                        @foreach (var e in Enum.GetValues(typeof(Enums.Statuses)).Cast<Enums.Statuses>())
+                        {
+                            <MudSelectItem Value="@(e)" />
+                        }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_release.Artist.Text"
+                                  For="@(() => _release.Artist.Text)"
+                                  Immediate="true"
+                                  Label="Artist Name" />
+                    <MudTextField @bind-Value="_release.ReleaseData.Text"
+                                  For="@(() => _release.ReleaseData.Text)"
+                                  Immediate="true"
+                                  Label="Release Title" />
+                    <MudDatePicker @bind-Date="_release.ReleaseDateDateTime"
+                                   For="@(() => _release.ReleaseDateDateTime)"
+                                   Label="Release Date"
+                                   Editable="true"
+                                   DateFormat="yyyy-MM-dd" />
+                    <MudSimpleTable Style="pa-4 overflow-x: auto;0" Hover="true" Striped="true">
+                    <colgroup>
+                       <col span="1" style="width: 5%;">
+                       <col span="1" style="width: 5%;">
+                       <col span="1" style="width: 35%;">
+                       <col span="1" style="width: 55%;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Media Number</th>
+                            <th>Track Number</th>
+                            <th>Track Artist Name</th>
+                            <th>Title</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var media in _release.Media.OrderBy(x => x.MediaNumber))
+                        {
+                            @foreach (var track in media.Tracks.OrderBy(x => x.TrackNumber))
+                            {
+                                    <tr Class="@($"track-{(track.IsValid ? "valid" : "invalid")}")">
+                                    <td>
+                                            <MudNumericField T="short?" @bind-Value="@media.MediaNumber"
+                                                  For="@(() => @media.MediaNumber)"
+                                                  Min="1"
+                                                  Max="500"
+                                                  Immediate="true" />
+
+                                    </td>
+                                    <td>
+                                            <MudNumericField @bind-Value="@track.TrackNumber"
+                                                  For="@(() => @track.TrackNumber)"
+                                                     Min="1"
+                                                     Max="1000"
+                                                  Immediate="true"/>
+                                    </td>
+                                        <td>
+                                            <MudTextField T="string" @bind-Value="@track.TrackArtist.ArtistData.Text"
+                                                  For="@(() => @track.TrackArtist.ArtistData.Text)"
+                                                  Immediate="true" />
+                                        </td>
+                                    <td>
+                                            <MudTextField @bind-Value="@track.Title"
+                                                  For="@(() => @track.Title)"
+                                                      Immediate="true"/>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </MudSimpleTable>
+                </MudCardContent>
+            </MudForm>
+            <MudCardActions>
+                <MudButton Disabled="@_submitted" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="@(async () => await Submit())">Save</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="4">
+        <MudSimpleTable Style="pa-4 overflow-x: auto;">
+            <thead>
+                <tr>
+                    @foreach (var h in messageHeadings)
+                    {
+                        <th>@h</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var message in _release.ProcessingMessages.OrderBy(x => x.IsOK).ThenBy(x => x.Message))
+                {
+                    <tr style="@($"message-ok-{ ( message.IsOK ? "1" : "0" )}")">
+                        <td>@message.StatusIndicator</td>
+                        <td>@message.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Inject]
+    ISnackbar Snackbar { get; set; }
+    bool success;
+    string[] errors = { };
+    MudForm form;
+    ReleaseFluentValidator releaseValidator = new ReleaseFluentValidator();
+    string[] messageHeadings = { "Type", "Details" };
+    bool _submitted = false;
+    ReleaseEditProcessor _releaseEditProcessor;
+
+    Release _release = new Release
+        {
+            Artist = new Models.DataToken(),
+            ReleaseData = new Models.DataToken(),
+            Media = new List<ReleaseMedia>
+            {
+                new ReleaseMedia 
+                { 
+                    Tracks = new List<Track>
+                    {
+                        new Track
+                        {
+                            TrackArtist = new Artist()
+                            {
+                                ArtistData = new Models.DataToken()
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+    //    OrderDetailsModelFluentValidator orderDetailsValidator = new OrderDetailsModelFluentValidator();
+
+    private async Task DeleteRelease()
+    {
+        Directory.Delete(_release.Directory, true);
+        Snackbar.Add("Deleted!");
+        NavigationManager.NavigateTo("/staging");
+    }
+
+    private async Task DeleteReleaseImages()
+    {
+        _release.CoverImage = null;
+        var releaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(_release.Directory), ImageType.Release, SearchOption.TopDirectoryOnly);
+        if (releaseImagesInDirectory?.Any() ?? false)
+        {
+            Parallel.ForEach(releaseImagesInDirectory, releaseImageInDirectory =>
+            {
+                releaseImageInDirectory.Delete();
+            });
+        }
+        var secondaryReleaseImagesInDirectory = ImageHelper.FindImageTypeInDirectory(new DirectoryInfo(_release.Directory), ImageType.ReleaseSecondary, SearchOption.TopDirectoryOnly);
+        if (secondaryReleaseImagesInDirectory?.Any() ?? false)
+        {
+            Parallel.ForEach(secondaryReleaseImagesInDirectory, secondaryReleaseImageInDirectory =>
+            {
+                secondaryReleaseImageInDirectory.Delete();
+            });
+        }
+    }
+
+    public async Task RemoveTextFromTrackTitles()
+    {
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true };
+
+        var dialog = await DialogService.ShowAsync<RemoveTextFromTrackTitleDialog>("Enter text to remove", 
+            new DialogParameters 
+            { 
+                ["TextToRemove"] = _release.Media.First().Tracks.First().Title 
+            },
+            closeOnEscapeKey);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            var d = result.Data as string[];
+            _releaseEditProcessor.ReplaceTextFromTracks(_release, d[0], d[1]);
+        }
+
+    }
+
+    public async Task Submit()
+    {
+        await form.Validate();
+
+        if (form.IsValid)
+        {
+            _submitted = true;
+            var saveProcessor = new ReleaseSaveProcessor(LoggerFactory.CreateLogger<ReleaseSaveProcessor>());
+            var result = await saveProcessor.ProcessAsync(DateTime.UtcNow, _release);
+            if(!result.Item1)
+            {
+                errors = result.Item2.ToArray();
+                Snackbar.Add("Error saving", MudBlazor.Severity.Error);
+                _submitted = false;
+            }
+            else
+            {
+                Snackbar.Add("Saved!");
+                NavigationManager.NavigateTo("/staging");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A standard AbstractValidator which contains multiple rules and can be shared with the back end API
+    /// </summary>
+    /// <typeparam name="Release"></typeparam>
+    public class ReleaseFluentValidator : AbstractValidator<Release>
+    {
+        public ReleaseFluentValidator()
+        {
+            RuleFor(x => x.ReleaseData.Text)
+                .NotEmpty()
+                .Length(1, 250);
+
+            RuleFor(x => x.Artist.Text)
+                .NotEmpty()
+                .Length(1, 250);
+
+            RuleFor(x => x.ReleaseDateDateTime)
+                .NotEmpty()
+                .ExclusiveBetween(DateTime.MinValue, DateTime.MaxValue);
+
+            RuleForEach(x => x.Media)
+                .SetValidator(new MediaFluentValidator());
+        }
+
+        public class MediaFluentValidator : AbstractValidator<ReleaseMedia>
+        {
+            public MediaFluentValidator()
+            {
+                RuleFor(x => x.MediaNumber)
+                    .NotNull()
+                    .ExclusiveBetween((short)(1), (short)1000);
+                RuleForEach(x => x.Tracks)
+                    .SetValidator(new TrackFluentValidator());
+            }
+
+        }
+
+        public class TrackFluentValidator : AbstractValidator<Track>
+        {
+            public TrackFluentValidator()
+            {
+                RuleFor(x => x.TrackNumber)
+                    .ExclusiveBetween(1, 1000);
+                RuleFor(x => x.TrackArtist.ArtistData.Text)
+                    .MaximumLength(500);
+                RuleFor(x => x.Title)
+                    .NotEmpty()
+                    .MaximumLength(250);
+            }
+
+        }
+
+        public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>
+         {
+             var result = await ValidateAsync(ValidationContext<Release>.CreateWithOptions((Release)model, x => x.IncludeProperties(propertyName)));
+             if (result.IsValid)
+             {
+                 return Array.Empty<string>();
+             }
+             return result.Errors.Select(e => e.ErrorMessage);
+         };
+    }
+
+    [Parameter]
+    public string? ReleaseDirectory { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ReleaseDirectory = System.Net.WebUtility.UrlDecode(ReleaseDirectory);
+        DirectoryProcessor directoryProcessor = new DirectoryProcessor(LoggerFactory.CreateLogger<DirectoryProcessor>());
+        _releaseEditProcessor = new ReleaseEditProcessor(LoggerFactory.CreateLogger<ReleaseEditProcessor>());
+        _release = await directoryProcessor.ProcessAsync(DateTime.UtcNow, ReleaseDirectory, Directory.GetFiles(ReleaseDirectory ?? string.Empty)) ?? _release;
+        _release.ReleaseDateDateTime = DateTime.Parse(_release.ReleaseDate ?? DateTime.MinValue.ToString());
+    }
+
+}
