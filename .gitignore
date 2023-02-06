@@ -261,3 +261,4 @@ __pycache__/
 *.pyc
 /Roadie.Api/logs/logs.db
 /Roadie.Api.Library/nuget.config
+/TED/appsettings.Development.json
