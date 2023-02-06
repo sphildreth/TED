@@ -25,6 +25,10 @@
     background-color: tomato !important;
 }
 
+.status-duplicate { 
+    border: 3px solid orange;
+}
+
 .track-list {
     margin-bottom: 3px;
 }

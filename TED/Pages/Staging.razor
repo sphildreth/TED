@@ -24,6 +24,7 @@
     <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Filter" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Filter">
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x != null, false))">No Filter</MudMenuItem>
         <MudDivider />
+        <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status == Enums.Statuses.Duplicate, false))">Duplicates</MudMenuItem>
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.TrackCount < 4, true))">Less than 3 Tracks</MudMenuItem>
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status != Enums.Statuses.Ok, false))">Needs Attention</MudMenuItem>
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status == Enums.Statuses.Ok, true))">Ready to Move</MudMenuItem>
@@ -103,10 +104,10 @@
                 <MudCardMedia class="pa-2" Height=200 Style="margin:auto;max-height:200px;width:200px;" Image=@($"data:image/jpeg;base64,{ Convert.ToBase64String(release.CoverImage?.Bytes ?? new byte[0])}") />
 
                 <MudCardContent>
-                    @foreach (var media in release.Media ?? Enumerable.Empty<ReleaseMedia>())
+                    @foreach (var media in (release.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber))
                     {
                         <MudText Class="@($"media-{(media.IsValid ? "valid" : "invalid")}")" Typo="Typo.subtitle1">Media Number: @media.MediaNumber</MudText>
-                        @foreach (var track in media.Tracks)
+                        @foreach (var track in media.Tracks.OrderBy(x => x.TrackNumber))
                         {
                             <div class="@($"track-{(track.IsValid ? "valid": "invalid")} track-list track-status-{track.Status.ToString().ToLower()} truncate-text")" aria-description="@track.Title">
                                 <div class="track-list-tracknumber-container">
@@ -245,16 +246,23 @@
         {
             return;
         }
+        var recheckDuplicates = false;
         var firstRelease = _releases.FirstOrDefault(x => x.Directory == release.Directory);
         if (firstRelease != null)
         {
             _releases.Remove(firstRelease);
+            recheckDuplicates = true;
         }
         firstRelease = _allReleases.FirstOrDefault(x => x.Directory == release.Directory);
         if (firstRelease != null)
         {
             _allReleases.Remove(firstRelease);
+            recheckDuplicates = true;
         }        
+        if (recheckDuplicates)
+        {
+            MarkDuplicates();
+        }
     }
 
     void EditRelease(StagingRelease release)
@@ -448,33 +456,56 @@
                 }
                 foreach (var subDir in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
                 {
-                    logger.LogDebug("Scanning [{ folder }] Directory [{ subDir }]", dir, subDir);
-                    if(DirectoryProcessor.ProcessSubDirectory(dir, new DirectoryInfo(subDir), _directoryProcessorLogger))
+                    try
                     {
-                        releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, Directory.GetFiles(subDir))).Adapt<StagingRelease>();
-                        if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
+                        logger.LogDebug("Scanning [{ folder }] Directory [{ subDir }]", dir, subDir);
+                        if(await DirectoryProcessor.ProcessSubDirectory(dir, new DirectoryInfo(subDir), _directoryProcessorLogger))
                         {
-                            releaseForDirectory.Selected = releaseForDirectory.IsValid;
-                            _releases.Add(releaseForDirectory);
-                            sw.Stop();
-                            StateHasChanged();
-                            logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
-                            sw.Restart();
+                            releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, Directory.GetFiles(subDir))).Adapt<StagingRelease>();
+                            if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
+                            {
+                                releaseForDirectory.Selected = releaseForDirectory.IsValid;
+                                _releases.Add(releaseForDirectory);
+                                sw.Stop();
+                                StateHasChanged();
+                                logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
+                                sw.Restart();
+                            }
+                        }
+                        if (_releases.Count() >= StagingDirectoryScanLimit)
+                        {
+                            Snackbar.Add($"Reached maximum Directory scan limit of [{StagingDirectoryScanLimit}]", MudBlazor.Severity.Info);
+                            break;
                         }
                     }
-                    if (_releases.Count() >= StagingDirectoryScanLimit)
+                    catch (Exception ex)
                     {
-                        Snackbar.Add($"Reached maximum Directory scan limit of [{StagingDirectoryScanLimit}]", MudBlazor.Severity.Info);
-                        break;
+                        logger.LogError(ex, "Error Scaning SubDirectory [{ subDir }]", subDir);
                     }
                 }
                 _processingDirectoryProgress++;
             }
-            _scanning = false;
+            _scanning = false; 
             _processingDirectoryProgress = 0;
             StateHasChanged();
             _allReleases = _releases;
-            logger.LogDebug("** Scanning Completed. Elapsed Time [{ elapsedTime }]", (DateTime.UtcNow - now).TotalMilliseconds);
+            MarkDuplicates();
+            logger.LogDebug("** Scanning Completed. Found [{ releaseCount }] Releases. Elapsed Time [{ elapsedTime }]", _releases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);
+        }
+    }
+
+    void MarkDuplicates()
+    {
+        var duplicates = _releases.GroupBy(x => x.ReleaseData?.Text);
+        if(duplicates.Count() > 1)
+        {
+            foreach(var duplicate in duplicates.Where(x => x.Count() > 1))
+            {
+                foreach(var dup in _releases.Where(x => string.Equals(x.ReleaseData.Text, duplicate.Key)))
+                {
+                    dup.Status = Enums.Statuses.Duplicate;
+                }
+            }
         }
     }
 }

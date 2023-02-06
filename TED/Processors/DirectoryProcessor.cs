@@ -52,7 +52,7 @@ namespace TED.Processors
             }
             foreach (var subDir in Directory.GetDirectories(dir, "*.*", SearchOption.AllDirectories))
             {
-                if (ProcessSubDirectory(dir, new DirectoryInfo(subDir), _logger))
+                if (await ProcessSubDirectory(dir, new DirectoryInfo(subDir), _logger))
                 {
                     filesInDirectory = Directory.GetFiles(dir);
                 }
@@ -96,13 +96,13 @@ namespace TED.Processors
                         }
                     }
                 }
+                var tagsFilesFound = allfileAtlsFound.Where(x => x.AudioFormat.ID > -1 && x.Duration > 0);
                 if (allfileAtlsFound.Any(x => x.AudioFormat.ID > -1))
                 {
-                    var tagsFilesFound = allfileAtlsFound.Where(x => x.AudioFormat.ID > -1 && x.Duration > 0);
-                    var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => !string.Equals(x.AudioFormat.ShortName, "mpeg", StringComparison.OrdinalIgnoreCase));
+                    var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => ShouldMediaTrackBeConverted(x));
                     if (doesReleaseHaveNonMp3Tracks)
                     {
-                        var cueCheckResult = await CheckIfDirectoryHasCueFile(dir);
+                        var cueCheckResult = await CheckIfDirectoryHasCueFile(dir, _logger);
                         if (cueCheckResult.Item1)
                         {
                             tagsFilesFound = cueCheckResult.Item2;
@@ -112,275 +112,276 @@ namespace TED.Processors
                             tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound);
                         }
                     }
-                    var filesAtlsGroupedByRelease = tagsFilesFound.GroupBy(x => x.Album);
-                    foreach (var groupedByRelease in filesAtlsGroupedByRelease)
-                    {
-                        var firstAtl = groupedByRelease.First();
-                        DateTime? releaseDate = null;
-                        var releaseYear = groupedByRelease.Where(x => x.Year > 0).FirstOrDefault()?.Year;
-                        if (releaseYear.HasValue && releaseYear > 0)
-                        {
-                            releaseDate = new DateTime(releaseYear.Value, 1, 1);
-                        }
-                        var releaseData = new Release
-                        {
-                            Artist = new Models.DataToken
-                            {
-                                Value = SafeParser.ToToken(firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist),
-                                Text = (firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist).CleanString()
-                            },
-                            ReleaseData = new Models.DataToken
-                            {
-                                Value = SafeParser.ToToken(groupedByRelease.Key),
-                                Text = groupedByRelease.Key.CleanString()
-                            },
-                            Genre = firstAtl.Genre.Nullify() == null ? null : new Models.DataToken
-                            {
-                                Value = SafeParser.ToToken(firstAtl.Genre),
-                                Text = firstAtl.Genre
-                            },
-                            Directory = dir,
-                            CreatedDate = now,
-                            Id = Guid.NewGuid(),
-                            MediaCount = tagsFilesFound.Select(x => x.DiscNumber ?? 0).Distinct().Count(),
-                            ReleaseDateDateTime = releaseDate,
-                            Year = releaseDate?.Year,
-                            Status = Enums.Statuses.New,
-                            TrackCount = groupedByRelease.First().TrackTotal
-                        };
-                        var firstAtlHasArtistImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Artist ||
-                                                                                                    x.PicType == ATL.PictureInfo.PIC_TYPE.Band);
-
-                        if (firstAtlHasArtistImage != null)
-                        {
-                            releaseData.ArtistThumbnail = new Models.Image
-                            {
-                                Bytes = firstAtlHasArtistImage.PictureData,
-                                Caption = firstAtlHasArtistImage.Description
-                            };
-                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Set ArtistThumbnail to ID3 found picture."));
-                        }
-                        else
-                        {
-                            var artistThumbnailData = await FirstArtistImageInDirectory(dir, releaseData.Artist?.Text, filesInDirectory, _logger);
-                            releaseData.ArtistThumbnail = artistThumbnailData.Item1;
-                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{artistThumbnailData.Item2}] number of Artist images.", artistThumbnailData.Item2 > 0, artistThumbnailData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
-                        }
-                        var firstAtlHasReleaseImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Front ||
-                                                                                                     x.PicType == ATL.PictureInfo.PIC_TYPE.Generic);
-                        if (firstAtlHasReleaseImage != null)
-                        {
-                            releaseData.CoverImage = new Models.Image
-                            {
-                                Bytes = firstAtlHasReleaseImage.PictureData,
-                                Caption = firstAtlHasReleaseImage.Description
-                            };
-                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Set CoverImage to ID3 found picture."));
-                        }
-                        else
-                        {
-                            var releaseCoverImageData = await FirstReleaseImageInDirectory(dir, releaseData.ReleaseData?.Text, filesInDirectory, _logger);
-                            releaseData.CoverImage = releaseCoverImageData.Item1;
-                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{releaseCoverImageData.Item2}] number of Release images.", releaseCoverImageData.Item2 > 0, releaseCoverImageData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
-                        }
-                        if (releaseData.CoverImage == null)
-                        {
-                            releaseData.CoverImage = new Models.Image
-                            {
-                                Bytes = Convert.FromBase64String(ImageNotFound)
-                            };
-                            releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : Statuses.Incomplete;
-                            releaseData.ProcessingMessages.Add(new ProcessMessage("CoverImage not found.", false, ProcessMessage.BadCheckMark));
-                        }
-                        var medias = new List<ReleaseMedia>();
-                        foreach (var mp3TagData in tagsFilesFound.GroupBy(x => x.DiscNumber))
-                        {
-                            var mediaTracks = tagsFilesFound.Where(x => x.DiscNumber == mp3TagData.Key);
-                            var mediaNumber = SafeParser.ToNumber<short?>(mp3TagData.Key) ?? 0;
-                            medias.Add(new ReleaseMedia
-                            {
-                                MediaNumber = mediaNumber < 1 ? SafeParser.ToNumber<short>(1) : mediaNumber,
-                                TrackCount = mediaTracks.Count(),
-                                SubTitle = mp3TagData.First().SeriesTitle,
-                                Tracks = mediaTracks.OrderBy(x => x.TrackNumber).Select(x => new Track
-                                {
-                                    CreatedDate = x.FileInfo().CreationTimeUtc,
-                                    LastUpdated = x.FileInfo().LastWriteTimeUtc,
-                                    Duration = x.DurationMs,
-                                    FileHash = HashHelper.GetHash(x.FileInfo().FullName).ToString(),
-                                    FileName = x.FileInfo().FullName,
-                                    FileSize = SafeParser.ToNumber<int?>(x.FileInfo().Length),
-                                    Id = Guid.NewGuid(),
-                                    Status = (x.FileInfo()?.Exists ?? false) ? Statuses.New : Statuses.Missing,
-                                    Title = x.Title.CleanString(),
-                                    TrackArtist = new Artist
-                                    {
-                                        ArtistData = new Models.DataToken
-                                        {
-                                            Value = SafeParser.ToToken(StringExt.DoStringsMatch(releaseData.Artist.Text, x.Artist) ? string.Empty : x.Artist),
-                                            Text = StringExt.DoStringsMatch(releaseData.Artist.Text, x.Artist) ? string.Empty : x.Artist
-                                        }
-                                    },
-                                    TrackNumber = x.TrackNumber
-                                }).ToArray()
-                            });
-                        }
-                        releaseData.Media = medias;
-                        releaseData.TrackCount = medias.Sum(x => x.TrackCount);
-                        releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : releaseData.Media.SelectMany(x => x.Tracks).Count() == releaseData.Media.Sum(x => x.TrackCount) ? Enums.Statuses.Ok : Enums.Statuses.Incomplete;
-                        releaseData.Duration = medias.SelectMany(x => x.Tracks).Sum(x => x.Duration);
-                        if (releaseData.Status == Enums.Statuses.Ok && directorySFVFile.Nullify() != null)
-                        {
-                            var mp3CountFromSFVFile = await GetMp3CountFromSFVFile(directorySFVFile);
-                            var doesTrackCountMatchSFVCount = releaseData.TrackCount == mp3CountFromSFVFile;
-                            if (!doesTrackCountMatchSFVCount)
-                            {
-                                releaseData.Status = Enums.Statuses.Incomplete;
-                            }
-                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Checked TrackCount with SFV expected [{mp3CountFromSFVFile}] found [{releaseData.TrackCount}]", doesTrackCountMatchSFVCount, doesTrackCountMatchSFVCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
-                        }
-                        if (releaseData.Status == Enums.Statuses.Ok && directoryM3UFile.Nullify() != null)
-                        {
-                            var mp3CountFromM3UFile = await GetMp3CountFromM3UFile(directoryM3UFile);
-                            var doesTrackCountMatchM3UCount = releaseData.TrackCount == mp3CountFromM3UFile;
-                            if (!doesTrackCountMatchM3UCount)
-                            {
-                                releaseData.Status = Enums.Statuses.Incomplete;
-                            }
-                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Checked TrackCount with M3U expected [{mp3CountFromM3UFile}] found [{releaseData.TrackCount}]", doesTrackCountMatchM3UCount, doesTrackCountMatchM3UCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
-                        }
-                        if (releaseData.Status == Statuses.Ok)
-                        {
-                            var doAllTracksHaveSameAlbumArtist = AllTracksForHaveSameArtist(releaseData.Artist.Text, tagsFilesFound);
-                            if (!doAllTracksHaveSameAlbumArtist)
-                            {
-                                releaseData.Status = Enums.Statuses.NeedsAttention;
-                                releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Tracks have different Album Artists [{tagsFilesFound.GroupBy(x => x.Artist).Select(x => x.Key).ToCsv()}]"));
-                            }
-                        }
-                        if (releaseData.Status == Statuses.Ok)
-                        {
-                            if (StringHasFeaturingFragments(releaseData.Artist.Text))
-                            {
-                                releaseData.Status = Enums.Statuses.NeedsAttention;
-                                releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Release Artist has featuring fragments"));
-                            }
-                        }
-                        foreach (var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v, i) => new { i, v }))
-                        {
-                            foreach (var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
-                            {
-                                var trackStatusCheckData = CheckTrackStatus(releaseData, track.t);
-                                track.t.Status = trackStatusCheckData.Item1;
-                                if (track.t.TrackNumber != track.i + 1)
-                                {
-                                    track.t.Status = Statuses.NeedsAttention;
-                                    releaseData.ProcessingMessages.Add(new ProcessMessage($"Track [{track.t.ToString()}] TrackNumber expected [{track.i + 1}] found [{track.t.TrackNumber}]", false, ProcessMessage.BadCheckMark));
-                                }
-                                if (trackStatusCheckData.Item2 != null)
-                                {
-                                    releaseData.ProcessingMessages.AddRange(trackStatusCheckData.Item2);
-                                }
-                                if (track?.t?.TrackArtist?.ArtistData?.Text != null && StringHasFeaturingFragments(track?.t?.TrackArtist?.ArtistData?.Text))
-                                {
-                                    track.t.Status = Statuses.NeedsAttention;
-                                    releaseData.ProcessingMessages.Add(new ProcessMessage($"Track [{track.t.ToString()}] TrackArtist has featuring fragments", false, ProcessMessage.BadCheckMark));
-                                }
-                            }
-                            if (releaseData.Status != Statuses.Reviewed && media.v.MediaNumber != media.i + 1)
-                            {
-                                releaseData.Status = Statuses.NeedsAttention;
-                                releaseData.ProcessingMessages.Add(new ProcessMessage($"Media [{media.v.ToString()}] MediaNumber expected [{media.i + 1}] found [{media.v.MediaNumber}]", false, ProcessMessage.BadCheckMark));
-                            }
-                        }
-                        releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : releaseData.Media.SelectMany(x => x.Tracks).Any(x => x.Status != Statuses.New) ? Statuses.NeedsAttention : releaseData.Status;
-                        if (releaseData.Status == Statuses.Ok)
-                        {
-                            var releaseStatusCheckData = CheckReleaseStatus(releaseData);
-                            releaseData.Status = releaseStatusCheckData.Item1;
-                            if (releaseStatusCheckData.Item2 != null)
-                            {
-                                releaseData.ProcessingMessages.AddRange(releaseStatusCheckData.Item2);
-                            }
-                        }
-                        if (releaseData.Status == Statuses.Ok)
-                        {
-                            if ((releaseData.Year ?? 0) <= DateTime.MinValue.Year)
-                            {
-                                releaseData.Status = Statuses.NeedsAttention;
-                                releaseData.ProcessingMessages.Add(new ProcessMessage($"Release Year [{releaseData.Year ?? 0}] is invalid", false, ProcessMessage.BadCheckMark));
-                            }
-                        }
-
-                        var roadieDataFileName = Path.Combine(dir, TedJSONFileName);
-                        System.IO.File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(releaseData));
-
-                        releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage($"Creation Date [{releaseData.CreatedDate}]"));
-                        releaseData.ProcessingMessages.Add(new ProcessMessage
-                            (
-                                "Duration is acceptable.",
-                                releaseData.Duration > 0,
-                                releaseData.Duration > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
-                            ));
-                        releaseData.ProcessingMessages.Add(new ProcessMessage
-                            (
-                                "Media count is acceptable",
-                                releaseData.MediaCount > 0,
-                                releaseData.MediaCount > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
-                            ));
-                        releaseData.ProcessingMessages.Add(new ProcessMessage
-                            (
-                                $"Release is {(releaseData.IsValid ? "valid" : "invalid")}",
-                                releaseData.IsValid,
-                                releaseData.IsValid ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
-                            ));
-                        releaseData.ProcessingMessages.Add(new ProcessMessage
-                            (
-                                $"Release {(releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? "does not require" : "requires")} editing",
-                                releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok,
-                                releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
-                            ));
-                        releaseData.ProcessingMessages.Add(new ProcessMessage
-                            (
-                                $"Status is {(releaseData.Status == Statuses.Ok ? "acceptable" : "not acceptable")}",
-                                releaseData.Status == Statuses.Ok,
-                                releaseData.Status == Statuses.Ok ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
-                            ));
-                        releaseData.ProcessingMessages.Add(new ProcessMessage
-                            (
-                                "Track count is acceptable",
-                                releaseData.TrackCount > 0,
-                                releaseData.TrackCount > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
-                            ));
-
-                        if (releaseData.ArtistThumbnail != null)
-                        {
-                            await File.WriteAllBytesAsync(Path.Combine(releaseData.Directory, "artist.jpg"), releaseData.ArtistThumbnail.Bytes);
-                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Updated Artist Thumbnail image file."));
-                        }
-                        if (releaseData.CoverImage != null)
-                        {
-                            await File.WriteAllBytesAsync(Path.Combine(releaseData.Directory, "cover.jpg"), releaseData.CoverImage.Bytes);
-                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Updated Release Cover image file."));
-                        }
-                        return releaseData;
-                    }
                 }
-                else
+                if(!tagsFilesFound.Any())
                 {
                     release.ProcessingMessages.Add(ProcessMessage.MakeBadMessage("No Media files found in dir"));
                     release.Status = Statuses.NoMediaFiles;
                     return release;
                 }
+                var filesAtlsGroupedByRelease = tagsFilesFound.GroupBy(x => x.Album);
+                foreach (var groupedByRelease in filesAtlsGroupedByRelease)
+                {
+                    var firstAtl = groupedByRelease.First();
+                    DateTime? releaseDate = null;
+                    var releaseYear = groupedByRelease.Where(x => x.Year > 0).FirstOrDefault()?.Year;
+                    if (releaseYear.HasValue && releaseYear > 0)
+                    {
+                        releaseDate = new DateTime(releaseYear.Value, 1, 1);
+                    }
+                    var releaseData = new Release
+                    {
+                        Artist = new Models.DataToken
+                        {
+                            Value = SafeParser.ToToken(firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist),
+                            Text = (firstAtl.AlbumArtist.Nullify() ?? firstAtl.Artist).CleanString()
+                        },
+                        ReleaseData = new Models.DataToken
+                        {
+                            Value = SafeParser.ToToken(groupedByRelease.Key),
+                            Text = groupedByRelease.Key.CleanString()
+                        },
+                        Genre = firstAtl.Genre.Nullify() == null ? null : new Models.DataToken
+                        {
+                            Value = SafeParser.ToToken(firstAtl.Genre),
+                            Text = firstAtl.Genre
+                        },
+                        Directory = dir,
+                        CreatedDate = now,
+                        Id = Guid.NewGuid(),
+                        MediaCount = tagsFilesFound.Select(x => x.DiscNumber ?? 0).Distinct().Count(),
+                        ReleaseDateDateTime = releaseDate,
+                        Year = releaseDate?.Year,
+                        Status = Enums.Statuses.New,
+                        TrackCount = groupedByRelease.First().TrackTotal
+                    };
+                    var firstAtlHasArtistImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Artist ||
+                                                                                                x.PicType == ATL.PictureInfo.PIC_TYPE.Band);
+
+                    if (firstAtlHasArtistImage != null)
+                    {
+                        releaseData.ArtistThumbnail = new Models.Image
+                        {
+                            Bytes = firstAtlHasArtistImage.PictureData,
+                            Caption = firstAtlHasArtistImage.Description
+                        };
+                        releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Set ArtistThumbnail to ID3 found picture."));
+                    }
+                    else
+                    {
+                        var artistThumbnailData = await FirstArtistImageInDirectory(dir, releaseData.Artist?.Text, filesInDirectory, _logger);
+                        releaseData.ArtistThumbnail = artistThumbnailData.Item1;
+                        releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{artistThumbnailData.Item2}] number of Artist images.", artistThumbnailData.Item2 > 0, artistThumbnailData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
+                    }
+                    var firstAtlHasReleaseImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Front ||
+                                                                                                 x.PicType == ATL.PictureInfo.PIC_TYPE.Generic);
+                    if (firstAtlHasReleaseImage != null)
+                    {
+                        releaseData.CoverImage = new Models.Image
+                        {
+                            Bytes = firstAtlHasReleaseImage.PictureData,
+                            Caption = firstAtlHasReleaseImage.Description
+                        };
+                        releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Set CoverImage to ID3 found picture."));
+                    }
+                    else
+                    {
+                        var releaseCoverImageData = await FirstReleaseImageInDirectory(dir, releaseData.ReleaseData?.Text, filesInDirectory, _logger);
+                        releaseData.CoverImage = releaseCoverImageData.Item1;
+                        releaseData.ProcessingMessages.Add(new ProcessMessage($"Found [{releaseCoverImageData.Item2}] number of Release images.", releaseCoverImageData.Item2 > 0, releaseCoverImageData.Item2 > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.Warning));
+                    }
+                    if (releaseData.CoverImage == null)
+                    {
+                        releaseData.CoverImage = new Models.Image
+                        {
+                            Bytes = Convert.FromBase64String(ImageNotFound)
+                        };
+                        releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : Statuses.Incomplete;
+                        releaseData.ProcessingMessages.Add(new ProcessMessage("CoverImage not found.", false, ProcessMessage.BadCheckMark));
+                    }
+                    var medias = new List<ReleaseMedia>();
+                    foreach (var mp3TagData in tagsFilesFound.GroupBy(x => x.DiscNumber))
+                    {
+                        var mediaTracks = tagsFilesFound.Where(x => x.DiscNumber == mp3TagData.Key);
+                        var mediaNumber = SafeParser.ToNumber<short?>(mp3TagData.Key) ?? 0;
+                        medias.Add(new ReleaseMedia
+                        {
+                            MediaNumber = mediaNumber < 1 ? SafeParser.ToNumber<short>(1) : mediaNumber,
+                            TrackCount = mediaTracks.Count(),
+                            SubTitle = mp3TagData.First().SeriesTitle,
+                            Tracks = mediaTracks.OrderBy(x => x.TrackNumber).Select(x => new Track
+                            {
+                                CreatedDate = x.FileInfo().CreationTimeUtc,
+                                LastUpdated = x.FileInfo().LastWriteTimeUtc,
+                                Duration = x.DurationMs,
+                                FileHash = HashHelper.GetHash(x.FileInfo().FullName).ToString(),
+                                FileName = x.FileInfo().FullName,
+                                FileSize = SafeParser.ToNumber<int?>(x.FileInfo().Length),
+                                Id = Guid.NewGuid(),
+                                Status = (x.FileInfo()?.Exists ?? false) ? Statuses.New : Statuses.Missing,
+                                Title = x.Title.CleanString(),
+                                TrackArtist = new Artist
+                                {
+                                    ArtistData = new Models.DataToken
+                                    {
+                                        Value = SafeParser.ToToken(StringExt.DoStringsMatch(releaseData.Artist.Text, x.Artist) ? string.Empty : x.Artist),
+                                        Text = StringExt.DoStringsMatch(releaseData.Artist.Text, x.Artist) ? string.Empty : x.Artist
+                                    }
+                                },
+                                TrackNumber = x.TrackNumber
+                            }).ToArray()
+                        });
+                    }
+                    releaseData.Media = medias;
+                    releaseData.TrackCount = medias.Sum(x => x.TrackCount);
+                    releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : releaseData.Media.SelectMany(x => x.Tracks).Count() == releaseData.Media.Sum(x => x.TrackCount) ? Enums.Statuses.Ok : Enums.Statuses.Incomplete;
+                    releaseData.Duration = medias.SelectMany(x => x.Tracks).Sum(x => x.Duration);
+                    if (releaseData.Status == Enums.Statuses.Ok && directorySFVFile.Nullify() != null)
+                    {
+                        var mp3CountFromSFVFile = await GetMp3CountFromSFVFile(directorySFVFile);
+                        var doesTrackCountMatchSFVCount = releaseData.TrackCount == mp3CountFromSFVFile;
+                        if (!doesTrackCountMatchSFVCount)
+                        {
+                            releaseData.Status = Enums.Statuses.Incomplete;
+                        }
+                        releaseData.ProcessingMessages.Add(new ProcessMessage($"Checked TrackCount with SFV expected [{mp3CountFromSFVFile}] found [{releaseData.TrackCount}]", doesTrackCountMatchSFVCount, doesTrackCountMatchSFVCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
+                    }
+                    if (releaseData.Status == Enums.Statuses.Ok && directoryM3UFile.Nullify() != null)
+                    {
+                        var mp3CountFromM3UFile = await GetMp3CountFromM3UFile(directoryM3UFile);
+                        var doesTrackCountMatchM3UCount = releaseData.TrackCount == mp3CountFromM3UFile;
+                        if (!doesTrackCountMatchM3UCount)
+                        {
+                            releaseData.Status = Enums.Statuses.Incomplete;
+                        }
+                        releaseData.ProcessingMessages.Add(new ProcessMessage($"Checked TrackCount with M3U expected [{mp3CountFromM3UFile}] found [{releaseData.TrackCount}]", doesTrackCountMatchM3UCount, doesTrackCountMatchM3UCount ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark));
+                    }
+                    if (releaseData.Status == Statuses.Ok)
+                    {
+                        var doAllTracksHaveSameAlbumArtist = AllTracksForHaveSameArtist(releaseData.Artist.Text, tagsFilesFound);
+                        if (!doAllTracksHaveSameAlbumArtist)
+                        {
+                            releaseData.Status = Enums.Statuses.NeedsAttention;
+                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Tracks have different Album Artists [{tagsFilesFound.GroupBy(x => x.Artist).Select(x => x.Key).ToCsv()}]"));
+                        }
+                    }
+                    if (releaseData.Status == Statuses.Ok)
+                    {
+                        if (StringHasFeaturingFragments(releaseData.Artist.Text))
+                        {
+                            releaseData.Status = Enums.Statuses.NeedsAttention;
+                            releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Release Artist has featuring fragments"));
+                        }
+                    }
+                    foreach (var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v, i) => new { i, v }))
+                    {
+                        foreach (var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
+                        {
+                            var trackStatusCheckData = CheckTrackStatus(releaseData, track.t);
+                            track.t.Status = trackStatusCheckData.Item1;
+                            if (track.t.TrackNumber != track.i + 1)
+                            {
+                                track.t.Status = Statuses.NeedsAttention;
+                                releaseData.ProcessingMessages.Add(new ProcessMessage($"Track [{track.t.ToString()}] TrackNumber expected [{track.i + 1}] found [{track.t.TrackNumber}]", false, ProcessMessage.BadCheckMark));
+                            }
+                            if (trackStatusCheckData.Item2 != null)
+                            {
+                                releaseData.ProcessingMessages.AddRange(trackStatusCheckData.Item2);
+                            }
+                            if (track?.t?.TrackArtist?.ArtistData?.Text != null && StringHasFeaturingFragments(track?.t?.TrackArtist?.ArtistData?.Text))
+                            {
+                                track.t.Status = Statuses.NeedsAttention;
+                                releaseData.ProcessingMessages.Add(new ProcessMessage($"Track [{track.t.ToString()}] TrackArtist has featuring fragments", false, ProcessMessage.BadCheckMark));
+                            }
+                        }
+                        if (releaseData.Status != Statuses.Reviewed && media.v.MediaNumber != media.i + 1)
+                        {
+                            releaseData.Status = Statuses.NeedsAttention;
+                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Media [{media.v.ToString()}] MediaNumber expected [{media.i + 1}] found [{media.v.MediaNumber}]", false, ProcessMessage.BadCheckMark));
+                        }
+                    }
+                    releaseData.Status = releaseData.Status == Statuses.Reviewed ? Statuses.Reviewed : releaseData.Media.SelectMany(x => x.Tracks).Any(x => x.Status != Statuses.New) ? Statuses.NeedsAttention : releaseData.Status;
+                    if (releaseData.Status == Statuses.Ok)
+                    {
+                        var releaseStatusCheckData = CheckReleaseStatus(releaseData);
+                        releaseData.Status = releaseStatusCheckData.Item1;
+                        if (releaseStatusCheckData.Item2 != null)
+                        {
+                            releaseData.ProcessingMessages.AddRange(releaseStatusCheckData.Item2);
+                        }
+                    }
+                    if (releaseData.Status == Statuses.Ok)
+                    {
+                        if ((releaseData.Year ?? 0) <= DateTime.MinValue.Year)
+                        {
+                            releaseData.Status = Statuses.NeedsAttention;
+                            releaseData.ProcessingMessages.Add(new ProcessMessage($"Release Year [{releaseData.Year ?? 0}] is invalid", false, ProcessMessage.BadCheckMark));
+                        }
+                    }
+
+                    var roadieDataFileName = Path.Combine(dir, TedJSONFileName);
+                    System.IO.File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(releaseData));
+
+                    releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage($"Creation Date [{releaseData.CreatedDate}]"));
+                    releaseData.ProcessingMessages.Add(new ProcessMessage
+                        (
+                            "Duration is acceptable.",
+                            releaseData.Duration > 0,
+                            releaseData.Duration > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                        ));
+                    releaseData.ProcessingMessages.Add(new ProcessMessage
+                        (
+                            "Media count is acceptable",
+                            releaseData.MediaCount > 0,
+                            releaseData.MediaCount > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                        ));
+                    releaseData.ProcessingMessages.Add(new ProcessMessage
+                        (
+                            $"Release is {(releaseData.IsValid ? "valid" : "invalid")}",
+                            releaseData.IsValid,
+                            releaseData.IsValid ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                        ));
+                    releaseData.ProcessingMessages.Add(new ProcessMessage
+                        (
+                            $"Release {(releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? "does not require" : "requires")} editing",
+                            releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok,
+                            releaseData.Status != Statuses.NeedsAttention || releaseData.Status == Statuses.Ok ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                        ));
+                    releaseData.ProcessingMessages.Add(new ProcessMessage
+                        (
+                            $"Status is {(releaseData.Status == Statuses.Ok ? "acceptable" : "not acceptable")}",
+                            releaseData.Status == Statuses.Ok,
+                            releaseData.Status == Statuses.Ok ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                        ));
+                    releaseData.ProcessingMessages.Add(new ProcessMessage
+                        (
+                            "Track count is acceptable",
+                            releaseData.TrackCount > 0,
+                            releaseData.TrackCount > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
+                        ));
+
+                    if (releaseData.ArtistThumbnail != null)
+                    {
+                        await File.WriteAllBytesAsync(Path.Combine(releaseData.Directory, "artist.jpg"), releaseData.ArtistThumbnail.Bytes);
+                        releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Updated Artist Thumbnail image file."));
+                    }
+                    if (releaseData.CoverImage != null)
+                    {
+                        await File.WriteAllBytesAsync(Path.Combine(releaseData.Directory, "cover.jpg"), releaseData.CoverImage.Bytes);
+                        releaseData.ProcessingMessages.Add(ProcessMessage.MakeInfoMessage("Updated Release Cover image file."));
+                    }
+                    return releaseData;
+                }
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error Processing Directory [{ dir }]", dir);
                 release.ProcessingMessages.Add(new ProcessMessage(ex));
             }
             return release;
         }
 
-        private async Task<(bool, IEnumerable<ATL.Track>?)> CheckIfDirectoryHasCueFile(string dir)
+        private static async Task<(bool, IEnumerable<ATL.Track>?)> CheckIfDirectoryHasCueFile(string dir, ILogger logger)
         {
             var result = new ConcurrentBag<ATL.Track>();
             var isrcCueSheets = Directory.GetFiles(dir, "*.cue");
@@ -405,7 +406,7 @@ namespace TED.Processors
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("Error reading CUE [{ CUEFileForReleaseDirectory }] [{ex}", CUEFileForReleaseDirectory, ex.ToString());
+                    logger.LogError("Error reading CUE [{ CUEFileForReleaseDirectory }] [{ex}", CUEFileForReleaseDirectory, ex.ToString());
                     return (false, null);
                 }
                 if (theReader != null)
@@ -515,66 +516,78 @@ namespace TED.Processors
             }
         }
 
-        public static bool ProcessSubDirectory(string releaseDirectory, DirectoryInfo subDirectory, ILogger logger)
+        public static async Task<bool> ProcessSubDirectory(string releaseDirectory, DirectoryInfo subDirectory, ILogger logger)
         {
             var processingFoundNewFiles = false;
-            var subDirectoryFiles = subDirectory.GetFiles("*.*", SearchOption.TopDirectoryOnly);
-            // If the subdir is a media folder (like "CD01") then move the media files from the sub directory up one with media name
-            if (IsDirectoryMediaDirectory(releaseDirectory, subDirectory.FullName))
+            try
             {
-                if (subDirectoryFiles.Any())
+                var subDirectoryFiles = subDirectory.GetFiles("*.mp3", SearchOption.TopDirectoryOnly);
+                // If the subdir is a media folder (like "CD01") then move the media files from the sub directory up one with media name
+                if (IsDirectoryMediaDirectory(releaseDirectory, subDirectory.FullName))
                 {
-                    Parallel.ForEach(subDirectoryFiles, subDirectoryFile =>
+                    if (subDirectoryFiles.Any())
                     {
-                        var fileAtl = new ATL.Track(subDirectoryFile.FullName);
-                        if (fileAtl.AudioFormat.ID > -1 && fileAtl.Duration > 0)
+                        Parallel.ForEach(subDirectoryFiles, subDirectoryFile =>
+                        {
+                            var fileAtl = new ATL.Track(subDirectoryFile.FullName);
+                            if (fileAtl.AudioFormat.ID > -1 && fileAtl.Duration > 0)
+                            {
+                                try
+                                {
+                                    var mediaNumber = fileAtl.DiscNumber ?? DetermineMediaNumberFromDirectory(subDirectory.Name);
+                                    if ((mediaNumber ?? 0) < 1)
+                                    {
+                                        mediaNumber = 1;
+                                    }
+                                    File.SetAttributes(subDirectoryFile.FullName, FileAttributes.Normal);
+                                    var newMediaFileName = Path.Combine(subDirectory.Parent.FullName, $"m{mediaNumber.ToStringPadLeft(3)} {subDirectoryFile.Name}");
+                                    subDirectoryFile.MoveTo(newMediaFileName, true);
+                                }
+                                catch (Exception ex)
+                                {
+                                    logger.LogError("Error Moving Media File [{subDirectoryFile}]: [{error}]", subDirectoryFile.FullName, ex.Message);
+                                }
+                            }
+                        });
+                        processingFoundNewFiles = true;
+                    }
+                    var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
+                    coverImages.AddRange((ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.ReleaseSecondary) ?? Enumerable.Empty<FileInfo>()));
+                    if (coverImages?.Any() ?? false)
+                    {
+                        Parallel.ForEach(coverImages, coverImage =>
                         {
                             try
                             {
-                                var mediaNumber = fileAtl.DiscNumber ?? DetermineMediaNumberFromDirectory(subDirectory.Name);
-                                if ((mediaNumber ?? 0) < 1)
-                                {
-                                    mediaNumber = 1;
-                                }
-                                File.SetAttributes(subDirectoryFile.FullName, FileAttributes.Normal);
-                                var newMediaFileName = Path.Combine(subDirectory.Parent.FullName, $"m{mediaNumber.ToStringPadLeft(3)} {subDirectoryFile.Name}");
-                                subDirectoryFile.MoveTo(newMediaFileName, true);
+                                File.SetAttributes(coverImage.FullName, FileAttributes.Normal);
+                                File.Move(coverImage.FullName, Path.Combine(subDirectory.Parent.FullName, coverImage.Name), true);
                             }
                             catch (Exception ex)
                             {
-                                logger.LogError("Error Moving Media File [{subDirectoryFile}]: [{error}]", subDirectoryFile.FullName, ex.Message);
+                                logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
                             }
-                        }
-                    });
-                    processingFoundNewFiles = true;
-                }
-                var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
-                coverImages.AddRange((ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.ReleaseSecondary) ?? Enumerable.Empty<FileInfo>()));
-                if (coverImages?.Any() ?? false)
-                {
-                    Parallel.ForEach(coverImages, coverImage =>
+                        });
+                        processingFoundNewFiles = true;
+                    }
+                    if (!subDirectory.EnumerateFiles().Any())
                     {
-                        try
-                        {
-                            File.SetAttributes(coverImage.FullName, FileAttributes.Normal);
-                            File.Move(coverImage.FullName, Path.Combine(subDirectory.Parent.FullName, coverImage.Name), true);
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
-                        }
-                    });
-                    processingFoundNewFiles = true;
+                        logger.LogDebug("Deleted SubDirectory [{ subDirectory }]", subDirectory.FullName);
+                        DeleteDirectory(subDirectory.FullName);
+                    }
                 }
-                if (!subDirectory.EnumerateFiles().Any())
+                else
                 {
-                    logger.LogDebug("Deleted SubDirectory [{ subDirectory }]", subDirectory.FullName);
-                    DeleteDirectory(subDirectory.FullName);
+                    processingFoundNewFiles = subDirectoryFiles.Any();
+                }
+                if((await CheckIfDirectoryHasCueFile(subDirectory.FullName, logger)).Item1)
+                {
+                    subDirectoryFiles = subDirectory.GetFiles("*.mp3", SearchOption.TopDirectoryOnly);
+                    processingFoundNewFiles = subDirectoryFiles.Any();
                 }
             }
-            else
+            catch (Exception ex)
             {
-                processingFoundNewFiles = subDirectoryFiles.Any();
+                logger.LogError(ex, "Error Processing SubDirectory [{ subDir }]", subDirectory.FullName);
             }
             return processingFoundNewFiles;
         }
@@ -605,20 +618,10 @@ namespace TED.Processors
                     Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
                 }, artistImagesInDirectory.Count(), 0);
             }
-            // See if parent folder has artist image
-            artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo.Parent, ImageType.Artist, SearchOption.TopDirectoryOnly);
-            if (artistImagesInDirectory?.Any() ?? false)
+            try
             {
-                logger.LogDebug("Found Artist image [{artistImage}]", artistImagesInDirectory.First().FullName);
-                return (new Image
-                {
-                    Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
-                }, artistImagesInDirectory.Count(), 0);
-            }
-            var parentCoversFolder = new DirectoryInfo(Path.Combine(dirInfo.Parent.FullName, "Covers"));
-            if (parentCoversFolder.Exists)
-            {
-                artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(parentCoversFolder, ImageType.Artist, SearchOption.TopDirectoryOnly);
+                // See if parent folder has artist image
+                artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo.Parent, ImageType.Artist, SearchOption.TopDirectoryOnly);
                 if (artistImagesInDirectory?.Any() ?? false)
                 {
                     logger.LogDebug("Found Artist image [{artistImage}]", artistImagesInDirectory.First().FullName);
@@ -627,15 +630,32 @@ namespace TED.Processors
                         Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
                     }, artistImagesInDirectory.Count(), 0);
                 }
-            }
-            var secondaryArtistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo, ImageType.ArtistSecondary, SearchOption.TopDirectoryOnly);
-            if (secondaryArtistImagesInDirectory?.Any() ?? false)
-            {
-                logger.LogDebug("Found Secondary Artist image [{artistImage}]", secondaryArtistImagesInDirectory.First().FullName);
-                return (new Image
+                var parentCoversFolder = new DirectoryInfo(Path.Combine(dirInfo.Parent.FullName, "Covers"));
+                if (parentCoversFolder.Exists)
                 {
-                    Bytes = await File.ReadAllBytesAsync(secondaryArtistImagesInDirectory.First().FullName)
-                }, 0, secondaryArtistImagesInDirectory.Count());
+                    artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(parentCoversFolder, ImageType.Artist, SearchOption.TopDirectoryOnly);
+                    if (artistImagesInDirectory?.Any() ?? false)
+                    {
+                        logger.LogDebug("Found Artist image [{artistImage}]", artistImagesInDirectory.First().FullName);
+                        return (new Image
+                        {
+                            Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
+                        }, artistImagesInDirectory.Count(), 0);
+                    }
+                }
+                var secondaryArtistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo, ImageType.ArtistSecondary, SearchOption.TopDirectoryOnly);
+                if (secondaryArtistImagesInDirectory?.Any() ?? false)
+                {
+                    logger.LogDebug("Found Secondary Artist image [{artistImage}]", secondaryArtistImagesInDirectory.First().FullName);
+                    return (new Image
+                    {
+                        Bytes = await File.ReadAllBytesAsync(secondaryArtistImagesInDirectory.First().FullName)
+                    }, 0, secondaryArtistImagesInDirectory.Count());
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error Finding Artist Image in [{ dir }]", dir);
             }
             return (null, 0, 0);
         }

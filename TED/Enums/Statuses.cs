@@ -14,6 +14,7 @@ namespace TED.Enums
         Migrated = 9,
         NeedsAttention = 10,
         NoMediaFiles = 11,
-        Deleted = 99
+        Deleted = 99,
+        Duplicate= 101
     }
 }
