@@ -426,6 +426,10 @@
             var directoryProcessor = new DirectoryProcessor(DirectoryProcessorLogger);
             var directorysToProcess = Directory.EnumerateDirectories(directoryToScan);
             _directorysFound = directorysToProcess.Count();
+            if (_directorysFound > StagingDirectoryScanLimit)
+            {
+                _directorysFound = StagingDirectoryScanLimit;
+            }
             var sw = new System.Diagnostics.Stopwatch();
             sw.Start();
             foreach (var dir in directorysToProcess)
@@ -487,6 +491,7 @@
             }
             _scanning = false; 
             _processingDirectoryProgress = 0;
+            DirectoryProcessor.DeleteEmptyFolders(directoryToScan);
             StateHasChanged();
             _allReleases = _releases;
             MarkDuplicates();

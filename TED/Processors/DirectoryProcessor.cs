@@ -109,7 +109,7 @@ namespace TED.Processors
                         }
                         else
                         {
-                            tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound);
+                            tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound.OrderBy(x => x.TrackNumber));
                         }
                     }
                 }
@@ -200,7 +200,7 @@ namespace TED.Processors
                         releaseData.ProcessingMessages.Add(new ProcessMessage("CoverImage not found.", false, ProcessMessage.BadCheckMark));
                     }
                     var medias = new List<ReleaseMedia>();
-                    foreach (var mp3TagData in tagsFilesFound.GroupBy(x => x.DiscNumber))
+                    foreach (var mp3TagData in tagsFilesFound.OrderBy(x => x.DiscNumber).GroupBy(x => x.DiscNumber))
                     {
                         var mediaTracks = tagsFilesFound.Where(x => x.DiscNumber == mp3TagData.Key);
                         var mediaNumber = SafeParser.ToNumber<short?>(mp3TagData.Key) ?? 0;
@@ -568,11 +568,6 @@ namespace TED.Processors
                             }
                         });
                         processingFoundNewFiles = true;
-                    }
-                    if (!subDirectory.EnumerateFiles().Any())
-                    {
-                        logger.LogDebug("Deleted SubDirectory [{ subDirectory }]", subDirectory.FullName);
-                        DeleteDirectory(subDirectory.FullName);
                     }
                 }
                 else
@@ -1080,6 +1075,27 @@ namespace TED.Processors
             if (IsDirectoryEmpty(sourceDirectory))
             {
                 Directory.Delete(sourceDirectory);
+            }
+        }
+
+        public static void DeleteFolderIfEmpty(DirectoryInfo dir)
+        {
+            if (dir.EnumerateFiles().Any() || dir.EnumerateDirectories().Any())
+            {
+                return;
+            }
+            DirectoryInfo parent = dir.Parent;
+            dir.Delete();
+
+            // Climb up to the parent
+            DeleteFolderIfEmpty(parent);
+        }
+
+        public static void DeleteEmptyFolders(string dir)
+        {
+            foreach (var subDir in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
+            {
+                DeleteFolderIfEmpty(new DirectoryInfo(subDir));
             }
         }
     }
