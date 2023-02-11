@@ -11,7 +11,7 @@ namespace TED.Utility
         }
 
         public static string[] GetFiles(string path,
-                                        string[]? patterns = null,
+                                        string[] patterns = null,
                                         SearchOption options = SearchOption.TopDirectoryOnly)
         {
             if (!Directory.Exists(path))

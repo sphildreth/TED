@@ -34,14 +34,14 @@ namespace TED.Processors
             _logger = logger;
         }
 
-        public async Task<Release?> ProcessAsync(DateTime now, string? dir, string[] filesInDirectory, bool? forceProcessing = false)
+        public async Task<Release> ProcessAsync(DateTime now, string dir, string[] filesInDirectory, bool? forceProcessing = false)
         {
             await CheckIfDirectoryHasMultipleReleases(now, dir);
 
             var doForceProcessing = forceProcessing ?? false;
             var allfileAtlsFound = new List<ATL.Track>();
-            string? directorySFVFile = null;
-            string? directoryM3UFile = null;
+            string directorySFVFile = null;
+            string directoryM3UFile = null;
             var release = new Release();
             release.Directory = dir;
             if (string.IsNullOrEmpty(dir))
@@ -381,7 +381,7 @@ namespace TED.Processors
             return release;
         }
 
-        private static async Task<(bool, IEnumerable<ATL.Track>?)> CheckIfDirectoryHasCueFile(string dir, ILogger logger)
+        private static async Task<(bool, IEnumerable<ATL.Track>)> CheckIfDirectoryHasCueFile(string dir, ILogger logger)
         {
             var result = new ConcurrentBag<ATL.Track>();
             var isrcCueSheets = Directory.GetFiles(dir, "*.cue");
@@ -480,7 +480,7 @@ namespace TED.Processors
             return (false, null);
         }
 
-        public async Task CheckIfDirectoryHasMultipleReleases(DateTime now, string? dir)
+        public async Task CheckIfDirectoryHasMultipleReleases(DateTime now, string dir)
         {
             var allSFVFilesInReleaseDirectory = Directory.GetFiles(dir, "*.sfv");
             if (allSFVFilesInReleaseDirectory.Count() > 1)
@@ -597,7 +597,7 @@ namespace TED.Processors
             return string.Equals(tracksGroupedByArtist.First().Key, albumArtist) && tracksGroupedByArtist.Count() == 1;
         }
 
-        private static async Task<(Image?, int, int)> FirstArtistImageInDirectory(string dir, string? artistName, string[] filesInDirectory, ILogger logger)
+        private static async Task<(Image, int, int)> FirstArtistImageInDirectory(string dir, string artistName, string[] filesInDirectory, ILogger logger)
         {
             if (dir.Nullify() == null)
             {
@@ -655,7 +655,7 @@ namespace TED.Processors
             return (null, 0, 0);
         }
 
-        public static bool IsImageAProofType(FileInfo? imageInfo)
+        public static bool IsImageAProofType(FileInfo imageInfo)
         {
             if (imageInfo == null)
             {
@@ -669,7 +669,7 @@ namespace TED.Processors
             return false;
         }
 
-        private async Task<(Image?, int, int)> FirstReleaseImageInDirectory(string dir, string? releaseTitle, string[] filesInDirectory, ILogger logger)
+        private async Task<(Image, int, int)> FirstReleaseImageInDirectory(string dir, string releaseTitle, string[] filesInDirectory, ILogger logger)
         {
             if (dir.Nullify() == null)
             {
@@ -715,7 +715,7 @@ namespace TED.Processors
             }
             try
             {
-                string? foundImageFileName = null;
+                string foundImageFileName = null;
                 var imagesByReleaseName = Directory.GetFiles(dir, $"{releaseTitle}*.jpg".ToFileNameFriendly()).ToList();
                 var parentCoversFolder = new DirectoryInfo(Path.Combine(dirInfo.Parent.FullName, "Covers"));
                 if (parentCoversFolder.Exists)
@@ -799,7 +799,7 @@ namespace TED.Processors
             return result;
         }
 
-        private static (Statuses, IEnumerable<ProcessMessage>?) CheckReleaseStatus(Release release)
+        private static (Statuses, IEnumerable<ProcessMessage>) CheckReleaseStatus(Release release)
         {
             if (ReleaseTitleHasUnwantedText(release?.ReleaseData?.Text ?? string.Empty))
             {
@@ -808,7 +808,7 @@ namespace TED.Processors
             return (release?.Status ?? Statuses.NeedsAttention, null);
         }
 
-        private static (Statuses, IEnumerable<ProcessMessage>?) CheckTrackStatus(Release release, Track track)
+        private static (Statuses, IEnumerable<ProcessMessage>) CheckTrackStatus(Release release, Track track)
         {
             if (release.Status == Statuses.Reviewed)
             {
@@ -829,7 +829,7 @@ namespace TED.Processors
             return false;
         }
 
-        public static bool StringHasFeaturingFragments(string? input)
+        public static bool StringHasFeaturingFragments(string input)
         {
             if (string.IsNullOrWhiteSpace(input))
             {
@@ -883,7 +883,7 @@ namespace TED.Processors
             return false;
         }
 
-        private static async Task<int> GetMp3CountFromM3UFile(string? filePath)
+        private static async Task<int> GetMp3CountFromM3UFile(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
@@ -900,7 +900,7 @@ namespace TED.Processors
             return result;
         }
 
-        private static async Task<int> GetMp3CountFromSFVFile(string? filePath)
+        private static async Task<int> GetMp3CountFromSFVFile(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
@@ -917,7 +917,7 @@ namespace TED.Processors
             return result;
         }
 
-        public static string? Mp3FileNameFromSFVLine(string? lineFromFile)
+        public static string Mp3FileNameFromSFVLine(string lineFromFile)
         {
             if (string.IsNullOrWhiteSpace(lineFromFile))
             {
@@ -949,7 +949,7 @@ namespace TED.Processors
 
         public static bool IsDirectoryEmpty(string path) => !Directory.EnumerateFileSystemEntries(path).Any();
 
-        public static string ReplaceTrackArtistSeperators(string? trackArtist)
+        public static string ReplaceTrackArtistSeperators(string trackArtist)
         {
             if (trackArtist.Nullify() == null)
             {
@@ -961,7 +961,7 @@ namespace TED.Processors
         /// <summary>
         /// Returns the given TrackTitle with the Feature first and the Featuring second
         /// </summary>
-        public static (string?, string?) RemoveFeaturingArtistFromTrackTitle(string trackTitle)
+        public static (string, string) RemoveFeaturingArtistFromTrackTitle(string trackTitle)
         {
             if (trackTitle.Nullify() == null)
             {
@@ -974,7 +974,7 @@ namespace TED.Processors
             var newTitle = trackTitle;
             var matches = HasFeatureFragmentsRegex.Match(trackTitle);
             newTitle = newTitle.Substring(0, matches.Index).CleanString();
-            string? featureArtist = ReplaceTrackArtistSeperators(HasFeatureFragmentsRegex.Replace(trackTitle.Substring(matches.Index), string.Empty).CleanString());
+            string featureArtist = ReplaceTrackArtistSeperators(HasFeatureFragmentsRegex.Replace(trackTitle.Substring(matches.Index), string.Empty).CleanString());
             featureArtist = featureArtist.TrimEnd(']', ')').Replace("\"", "'");
             return (newTitle, featureArtist);
         }
@@ -1004,7 +1004,7 @@ namespace TED.Processors
             return Regex.IsMatch(dir, $"cover(s*)|scans", RegexOptions.IgnoreCase);
         }
 
-        public static bool IsDirectoryMediaDirectory(string? releaseDirectory, string dir)
+        public static bool IsDirectoryMediaDirectory(string releaseDirectory, string dir)
         {
             if (dir.Nullify() == null)
             {

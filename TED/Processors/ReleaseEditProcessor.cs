@@ -16,7 +16,7 @@ namespace TED.Processors
             _logger = logger;
         }
 
-        public async Task<(bool, IEnumerable<string>)> ProcessAsync(DateTime now, Release release)
+        public Task<(bool, IEnumerable<string>)> ProcessAsync(DateTime now, Release release)
         {
             throw new NotImplementedException();
         }
@@ -41,7 +41,7 @@ namespace TED.Processors
             return Task.FromResult(release);
         }
 
-        public static string? RemoveArtistFromTrackArtist(string? artist, string? trackArtist)
+        public static string RemoveArtistFromTrackArtist(string artist, string trackArtist)
         {
             if (artist.Nullify() == null)
             {
@@ -54,7 +54,7 @@ namespace TED.Processors
             return Regex.Replace(trackArtist, $"\\s*({artist})\\s*(&|and|with)*", string.Empty).Trim();
         }
 
-        public static string? RemoveUnwantedTextFromReleaseTitle(string? title)
+        public static string RemoveUnwantedTextFromReleaseTitle(string title)
         {
             if (title.Nullify() == null)
             {
@@ -134,7 +134,7 @@ namespace TED.Processors
             release.Media = medias;
         }
 
-        public async Task PromoteTrackArtist(Release release)
+        public void PromoteTrackArtist(Release release)
         {
             release.Artist = release.Media.First().Tracks.First().TrackArtist.ArtistData;
             var medias = (release?.Media ?? Enumerable.Empty<ReleaseMedia>()).OrderBy(x => x.MediaNumber).ToList();

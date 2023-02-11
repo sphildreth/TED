@@ -37,7 +37,7 @@ namespace TED.Processors
                 }
                 var filesInDirectory = Directory.GetFiles(releaseDirectory, "*.mp3");
                 var releaseArtist = release.Artist?.Text ?? throw new Exception("Invalid Release artist");
-                await Parallel.ForEachAsync(filesInDirectory, async (file, cancellationTokenfile) =>
+                Parallel.ForEach(filesInDirectory, file =>
                 {
                     var fullPathToFile = Path.Combine(releaseDirectory, file);
                     var fileAtl = new ATL.Track(file);

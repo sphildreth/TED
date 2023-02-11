@@ -113,7 +113,7 @@ namespace TED.Utility
         /// <summary>
         ///     Safely Return a Number For Given Input
         /// </summary>
-        public static T? ToNumber<T>(object? input)
+        public static T ToNumber<T>(object input)
         {
             if (input == null) return default(T);
             try
@@ -126,7 +126,7 @@ namespace TED.Utility
             }
         }
 
-        public static string? ToString(object input, string? defaultValue = null)
+        public static string ToString(object input, string defaultValue = null)
         {
             defaultValue = defaultValue ?? string.Empty;
             switch (input)
@@ -158,9 +158,9 @@ namespace TED.Utility
             return null;
         }
 
-        private static T? ChangeType<T>(object value)
+        private static T ChangeType<T>(object value)
         {
-            Type? t = typeof(T);            
+            Type t = typeof(T);            
             if (!t.IsGenericType || t.GetGenericTypeDefinition() != typeof(Nullable<>))
             {
                 return (T)Convert.ChangeType(value, t);
@@ -173,7 +173,7 @@ namespace TED.Utility
             return t == null ? default(T) : (T)Convert.ChangeType(value, t);
         }
 
-        public static string? ToToken(string input)
+        public static string ToToken(string input)
         {
             if(input.Nullify() == null)
             {
@@ -195,7 +195,7 @@ namespace TED.Utility
             return hashids.Encode(numbers);
         }
 
-        public static string? ToFileNameFriendly(this string input)
+        public static string ToFileNameFriendly(this string input)
         {
             if (string.IsNullOrEmpty(input))
             {

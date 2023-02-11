@@ -3,7 +3,7 @@ namespace TED.Utility
     public sealed class RandomNumber : IRandomNumber
     {
         private static readonly Random Global = new Random();
-        [ThreadStatic] private static Random? _local;
+        [ThreadStatic] private static Random _local;
 
         public int Next(int max)
         {

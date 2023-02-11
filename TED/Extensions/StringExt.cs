@@ -30,7 +30,7 @@ namespace TED.Extensions
             {'ý', "y"}, {'ÿ', "y"}
         };
 
-        public static string? Nullify(this string? input)
+        public static string Nullify(this string input)
         {
             if (string.IsNullOrEmpty(input) || string.IsNullOrWhiteSpace(input))
             {
@@ -39,7 +39,7 @@ namespace TED.Extensions
             return input;
         }
 
-        public static string? CleanString(this string? input)
+        public static string CleanString(this string input)
         {
             if (string.IsNullOrEmpty(input) || string.IsNullOrWhiteSpace(input))
             {
@@ -143,7 +143,7 @@ namespace TED.Extensions
             return str;
         }
 
-        public static bool DoStringsMatch(string? string1, string? string2)
+        public static bool DoStringsMatch(string string1, string string2)
         {
             var a1 = string1.Nullify();
             var a2 = string2.Nullify();

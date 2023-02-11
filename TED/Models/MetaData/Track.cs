@@ -24,31 +24,31 @@ namespace TED.Models.MetaData
                        FileSize > 0 &&
                        (Status != Statuses.Missing && Status != Statuses.NeedsAttention);
 
-        public string? FileName { get; set; }
+        public string FileName { get; set; }
 
-        public string? FileHash { get; set; }
+        public string FileHash { get; set; }
 
         public double? Duration { get; set; }
 
-        public string? DurationTime => Duration.HasValue ? new TimeInfo(SafeParser.ToNumber<decimal>(Duration.Value)).ToFullFormattedString() : "--:--";
+        public string DurationTime => Duration.HasValue ? new TimeInfo(SafeParser.ToNumber<decimal>(Duration.Value)).ToFullFormattedString() : "--:--";
 
-        public string? DurationTimeShort => Duration.HasValue ? new TimeInfo(SafeParser.ToNumber<decimal>(Duration.Value)).ToShortFormattedString() : "--:--";
+        public string DurationTimeShort => Duration.HasValue ? new TimeInfo(SafeParser.ToNumber<decimal>(Duration.Value)).ToShortFormattedString() : "--:--";
 
         public int? FileSize { get; set; }
 
-        public IEnumerable<string>? PartTitlesList { get; set; }
+        public IEnumerable<string> PartTitlesList { get; set; }
 
         public DateTime? ReleaseDate { get; set; }
 
-        public Statuses? Status { get; set; }
+        public Statuses Status { get; set; } = Statuses.Missing;
 
-        public string StatusVerbose => (Status ?? Statuses.Missing).ToString();
+        public string StatusVerbose => Status.ToString();
 
-        public Image? Thumbnail { get; set; }
+        public Image Thumbnail { get; set; }
 
-        public string? Title { get; set; }
+        public string Title { get; set; }
 
-        public Artist? TrackArtist { get; set; }
+        public Artist TrackArtist { get; set; }
 
         public int? TrackNumber { get; set; }
 

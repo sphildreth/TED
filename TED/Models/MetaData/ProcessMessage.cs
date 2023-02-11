@@ -10,17 +10,17 @@
 
         public static string Warning = "⛔";
 
-        public string? Message { get; set; }
+        public string Message { get; set; }
 
         public bool IsOK { get; set; }
 
-        public string? StatusIndicator { get; set; }
+        public string StatusIndicator { get; set; }
 
         public ProcessMessage()
         {
         }
 
-        public ProcessMessage(string? message, bool isOK, string? statusIndicator)
+        public ProcessMessage(string message, bool isOK, string statusIndicator)
         {
             Message = message;
             IsOK = isOK;

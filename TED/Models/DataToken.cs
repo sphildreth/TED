@@ -12,12 +12,12 @@ namespace TED.Models
         /// <summary>
         /// This is the Text to show to the user (ie name of genre or artist or label)
         /// </summary>
-        public string? Text { get; set; }
+        public string Text { get; set; }
 
         /// <summary>
         /// This is the value to submit or the Key (Guid) of the item
         /// </summary>
-        public string? Value { get; set; }
+        public string Value { get; set; }
 
         public int RandomSortId { get; set; }
 

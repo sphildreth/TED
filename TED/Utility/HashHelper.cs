@@ -5,7 +5,7 @@ namespace TED.Utility
 {
     public static class HashHelper
     {
-        public static string? CreateMD5(string input)
+        public static string CreateMD5(string input)
         {
             if (string.IsNullOrEmpty(input))
             {
@@ -14,9 +14,9 @@ namespace TED.Utility
             return CreateMD5(System.Text.Encoding.UTF8.GetBytes(input));
         }
 
-        public static string? CreateMD5(FileInfo file) => CreateMD5(File.ReadAllBytes(file.FullName));
+        public static string CreateMD5(FileInfo file) => CreateMD5(File.ReadAllBytes(file.FullName));
 
-        public static string? CreateMD5(byte[] bytes)
+        public static string CreateMD5(byte[] bytes)
         {
             if (bytes == null || !bytes.Any())
             {

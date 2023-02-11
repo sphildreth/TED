@@ -14,7 +14,7 @@ namespace TED.Models.MetaData
         {
         }
 
-        public Release(IRandomNumber? randomNumber, IClock? clock)
+        public Release(IRandomNumber randomNumber, IClock clock)
             : base(randomNumber, clock)
         {
         }
@@ -24,11 +24,11 @@ namespace TED.Models.MetaData
             return $"Status [{Status}] Directory [{Directory}]";
         }
 
-        public DataToken? Artist { get; set; }
+        public DataToken Artist { get; set; }
 
-        public Image? ArtistThumbnail { get; set; }
+        public Image ArtistThumbnail { get; set; }
 
-        public Image? CoverImage { get; set; }
+        public Image CoverImage { get; set; }
 
         /// <summary>
         /// Total Duration of the Release in Milliseconds
@@ -67,7 +67,7 @@ namespace TED.Models.MetaData
             }
         }
 
-        public DataToken? Genre { get; set; }
+        public DataToken Genre { get; set; }
 
         public bool IsValid => Id != Guid.Empty &&
                        !string.IsNullOrEmpty(Artist?.Text) &&
@@ -75,15 +75,15 @@ namespace TED.Models.MetaData
                        CoverImage?.Bytes?.Length > 0 &&
                        (Status != Statuses.Incomplete && Status != Statuses.NeedsAttention && Status != Statuses.Incomplete);
 
-        public IEnumerable<ReleaseMedia>? Media { get; set; }
+        public IEnumerable<ReleaseMedia> Media { get; set; }
 
         public int? MediaCount { get; set; }
 
-        public DataToken? ReleaseData { get; set; }
+        public DataToken ReleaseData { get; set; }
 
-        private string? _releaseDate;
+        private string _releaseDate;
 
-        public string? ReleaseDate
+        public string ReleaseDate
         {
             get
             {

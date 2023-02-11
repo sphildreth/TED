@@ -50,7 +50,7 @@ namespace TED.Utility
 
         public decimal? Years { get; set; }
 
-        public string? YearsFormatted
+        public string YearsFormatted
         {
             get
             {

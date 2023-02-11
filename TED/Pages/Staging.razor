@@ -158,6 +158,7 @@
     protected override async Task OnInitializedAsync()
     {
         _releaseEditProcessor = new ReleaseEditProcessor(LoggerFactory.CreateLogger<ReleaseEditProcessor>());
+        await Task.CompletedTask;
     }
 
     void OpenReleaseDirectory(string dir)
@@ -435,7 +436,7 @@
             foreach (var dir in directorysToProcess)
             {
                 logger.LogDebug("Scanning [{ folder }]", dir);
-                StagingRelease? releaseForDirectory = null;
+                StagingRelease releaseForDirectory = null;
                 var filesInDirectory = Directory.GetFiles(dir, "*.*", SearchOption.TopDirectoryOnly);
                 if (filesInDirectory.Any())
                 {
@@ -506,7 +507,7 @@
         {
             foreach(var duplicate in duplicates.Where(x => x.Count() > 1))
             {
-                foreach(var dup in _releases.Where(x => string.Equals(x.ReleaseData.Text, duplicate.Key)))
+                foreach(var dup in _releases.Where(x => x.ReleaseData?.Text.Nullify() != null && string.Equals(x.ReleaseData.Text, duplicate.Key)))
                 {
                     dup.Status = Enums.Statuses.Duplicate;
                 }

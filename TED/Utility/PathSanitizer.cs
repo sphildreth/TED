@@ -53,7 +53,7 @@ namespace TED.Utility
         /// <param name="input">the string to clean</param>
         /// <param name="errorChar">the character which replaces bad characters</param>
         /// <returns></returns>
-        public static string? SanitizeFilename(string input, char errorChar)
+        public static string SanitizeFilename(string input, char errorChar)
         {
             return Sanitize(input, invalidFilenameChars, errorChar);
         }
@@ -64,7 +64,7 @@ namespace TED.Utility
         /// <param name="input">the string to clean</param>
         /// <param name="errorChar">the character which replaces bad characters</param>
         /// <returns></returns>
-        public static string? SanitizePath(string input, char errorChar)
+        public static string SanitizePath(string input, char errorChar)
         {
             return Sanitize(input, invalidPathChars, errorChar);
         }
@@ -76,7 +76,7 @@ namespace TED.Utility
         /// <param name="invalidChars"></param>
         /// <param name="errorChar"></param>
         /// <returns></returns>
-        private static string? Sanitize(string input, char[] invalidChars, char errorChar)
+        private static string Sanitize(string input, char[] invalidChars, char errorChar)
         {
             // null always sanitizes to null
             if (input == null)

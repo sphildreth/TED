@@ -7,6 +7,7 @@
 *.userosscache
 *.sln.docstates
 
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -24,6 +25,8 @@ bld/
 
 # Visual Studio 2015 cache/options directory
 .vs/
+.vscode/
+
 # Uncomment if you have tasks that create the project's static files in wwwroot
 #wwwroot/
 
@@ -194,6 +197,7 @@ ClientBin/
 *.publishsettings
 node_modules/
 orleans.codegen.cs
+app.log
 
 # Since there are multiple workflows, uncomment next line to ignore bower_components
 # (https://github.com/github/gitignore/pull/1529#issuecomment-104372622)
