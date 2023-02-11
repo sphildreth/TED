@@ -162,7 +162,7 @@
 
     void OpenReleaseDirectory(string dir)
     {
-        System.Diagnostics.Process.Start("explorer.exe", dir);
+        System.Diagnostics.Process.Start(dir);
     }
 
     async Task DeleteAllImagesInDirectory(string dir)

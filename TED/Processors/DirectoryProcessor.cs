@@ -715,7 +715,7 @@ namespace TED.Processors
             }
             try
             {
-                string foundImageFileName = null;
+                string? foundImageFileName = null;
                 var imagesByReleaseName = Directory.GetFiles(dir, $"{releaseTitle}*.jpg".ToFileNameFriendly()).ToList();
                 var parentCoversFolder = new DirectoryInfo(Path.Combine(dirInfo.Parent.FullName, "Covers"));
                 if (parentCoversFolder.Exists)
@@ -730,12 +730,12 @@ namespace TED.Processors
                 {
                     foundImageFileName = imagesByReleaseName.First();
                 }
-                if (foundImageFileName == null)
+                if (foundImageFileName == null && releaseTitle.Nullify() != null)
                 {
                     var allImagesInDirectory = Directory.GetFiles(dir, "*.jpg");
                     if (allImagesInDirectory?.Any() ?? false)
                     {
-                        foundImageFileName = allImagesInDirectory.FirstOrDefault(x => x.ToAlphanumericName().Contains(releaseTitle.ToAlphanumericName()));
+                        foundImageFileName = allImagesInDirectory.FirstOrDefault(x => x.Nullify() != null && x.ToAlphanumericName().Contains(releaseTitle.ToAlphanumericName()));
                     }
                 }
                 if (foundImageFileName != null && !IsImageAProofType(new FileInfo(foundImageFileName)))

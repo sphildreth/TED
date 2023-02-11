@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ted\TED.csproj" />
+    <ProjectReference Include="..\TED\TED.csproj" />
   </ItemGroup>
 
 </Project>

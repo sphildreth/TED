@@ -32,5 +32,16 @@ namespace TED.Tests
         {
             Assert.AreEqual(shouldBe, input.CleanString());
         }
+
+        [TestMethod]
+        [DataRow("Bob", "Bob")]
+        [DataRow(null, null)]
+        [DataRow("", null)]
+        [DataRow(" ", null)]
+        [DataRow("Bob ", "Bob ")]
+        public void Nullify(string? input, string? shouldBe)
+        {
+            Assert.AreEqual(shouldBe, input.Nullify());
+        }        
     }
 }
