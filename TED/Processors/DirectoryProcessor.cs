@@ -96,7 +96,7 @@ namespace TED.Processors
                         }
                     }
                 }
-                var tagsFilesFound = allfileAtlsFound.Where(x => x.AudioFormat.ID > -1 && x.Duration > 0);
+                var tagsFilesFound = allfileAtlsFound.Where(x => IsATLTrackForMP3(x));
                 if (allfileAtlsFound.Any(x => x.AudioFormat.ID > -1))
                 {
                     var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => ShouldMediaTrackBeConverted(x));
@@ -994,6 +994,21 @@ namespace TED.Processors
             }
             return 1;
         }
+
+        public static bool IsATLTrackForMP3(ATL.Track track)
+        {
+            if(track?.AudioFormat?.ShortName == null)
+            {
+                return false;
+            }
+            if(string.Equals(track.AudioFormat?.ShortName, "mpeg-4", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"Video file found in Scanning. File [{ track.FileInfo().FullName }]");
+                return false;
+            }
+            return track.AudioFormat.ID > -1 && track.Duration > 0;
+        }
+
 
         public static bool IsCoverImagesDirectory(string dir)
         {
