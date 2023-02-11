@@ -163,7 +163,11 @@
 
     void OpenReleaseDirectory(string dir)
     {
-        System.Diagnostics.Process.Start(dir);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo() {
+            FileName = dir,
+            UseShellExecute = true,
+            Verb = "open"
+        });        
     }
 
     async Task DeleteAllImagesInDirectory(string dir)
