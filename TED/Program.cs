@@ -19,6 +19,8 @@ builder.Services.AddLogging(loggingBuilder => {
     loggingBuilder.AddFile(loggingSection);
 });
 
+builder.Services.Configure<TED.Models.Configuration>(builder.Configuration.GetSection("TED"));
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

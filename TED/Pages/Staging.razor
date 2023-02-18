@@ -1,17 +1,18 @@
 @using TED.Models.MetaData;
 @using System.Text.Json
 @using Mapster;
-@using Microsoft.Extensions.Configuration
 @using TED.Processors;
 @using TED.Utility;
 @using TED.Extensions;
+@using Microsoft.Extensions.Options;
 
 @inject IDialogService DialogService
 @inject IConfiguration Configuration
 @inject NavigationManager UriHelper
 @inject ILogger<Staging> logger
 @inject ILoggerFactory LoggerFactory
-
+@inject IOptions<TED.Models.Configuration> TEDConfiguration
+ 
 @page "/staging"
 
 <PageTitle>Staging</PageTitle>
@@ -201,7 +202,7 @@
                 atl.Save();
             });
             var parentDirectory = Directory.GetParent(dir).FullName;
-            var isParentDirectoryInboundFolder = string.Equals(parentDirectory, @Configuration["TED:StagingDirectory"], StringComparison.OrdinalIgnoreCase);
+            var isParentDirectoryInboundFolder = string.Equals(parentDirectory, TEDConfiguration.Value.StagingDirectory, StringComparison.OrdinalIgnoreCase);
             if (!isParentDirectoryInboundFolder)
             {
                 foreach (string imageFile in Directory.GetFiles(parentDirectory, "*.jpg", SearchOption.AllDirectories))
@@ -377,7 +378,7 @@
     async Task MoveCheckedToInbound()
     {
         _movingFolders = true;
-        var inboundDirectory = @Configuration["TED:InboundDirectory"];
+        var inboundDirectory = TEDConfiguration.Value.InboundDirectory;
         var selectedReleases = _releases.Where(x => x.Selected);
         _directorysFound = selectedReleases.Count();
         _processingDirectoryProgress = 0;
@@ -413,7 +414,7 @@
         {
             if (_stagingDirectoryScanLimit == 0)
             {
-                _stagingDirectoryScanLimit = SafeParser.ToNumber<int?>(@Configuration["TED:StagingDirectoryScanLimit"]) ?? 250;
+                _stagingDirectoryScanLimit = TEDConfiguration.Value.StagingDirectoryScanLimit;
             }
             return _stagingDirectoryScanLimit;
         }
@@ -427,8 +428,8 @@
             _scanning = true;
             var now = DateTime.UtcNow;
             _releases = new List<StagingRelease>();
-            var directoryToScan = @Configuration["TED:StagingDirectory"];
-            var directoryProcessor = new DirectoryProcessor(DirectoryProcessorLogger);
+            var directoryToScan = TEDConfiguration.Value.StagingDirectory;
+            var directoryProcessor = new DirectoryProcessor(DirectoryProcessorLogger, TEDConfiguration.Value.StagingDirectoryExtensionsToIgnore);
             var directorysToProcess = Directory.EnumerateDirectories(directoryToScan);
             _directorysFound = directorysToProcess.Count();
             if (_directorysFound > StagingDirectoryScanLimit)

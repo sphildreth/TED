@@ -52,6 +52,7 @@ namespace TED.Tests
         [DataRow("Experience Yourself Ep", false)]
         [DataRow("Release■Title", false)]
         [DataRow("Release💣Title", false)]
+        [DataRow("The Fine Art Of Self Destruction", false)]         
         [DataRow(null, true)]
         [DataRow("", true)]
         [DataRow(" ", true)]

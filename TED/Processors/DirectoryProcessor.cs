@@ -17,7 +17,7 @@ namespace TED.Processors
     {
         public const int MaximumDiscNumber = 500;
 
-        public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(self|bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web|\(320\)|\(*compilation\)*)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(bonus|release|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web|\(320\)|\(*compilation\)*)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static readonly Regex UnwantedTrackTitleTextRegex = new(@"(\s{2,}|(\s\(prod\s))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -29,13 +29,31 @@ namespace TED.Processors
 
         private readonly ILogger _logger;
 
-        public DirectoryProcessor(ILogger<DirectoryProcessor> logger)
+        private readonly IEnumerable<string> _extensionsToIgnore = null;
+
+        public DirectoryProcessor(ILogger<DirectoryProcessor> logger, IEnumerable<string> extensionsToIgnore = null)
         {
             _logger = logger;
+            _extensionsToIgnore = extensionsToIgnore ?? Enumerable.Empty<string>();
         }
 
         public async Task<Release> ProcessAsync(DateTime now, string dir, string[] filesInDirectory, bool? forceProcessing = false)
         {
+            PreProcessDirectory(dir);
+
+            if(_extensionsToIgnore.Any())
+            {
+                var modifiedFilesInDirectory = new List<string>();
+                foreach(var fileinDirectory in filesInDirectory)
+                {
+                    if(!_extensionsToIgnore.Any(x => string.Equals(Path.GetExtension(fileinDirectory), $".{x}", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        modifiedFilesInDirectory.Add(fileinDirectory);
+                    }
+                }
+                filesInDirectory = modifiedFilesInDirectory.ToArray();
+            }
+
             await CheckIfDirectoryHasMultipleReleases(now, dir);
 
             var doForceProcessing = forceProcessing ?? false;
@@ -478,6 +496,10 @@ namespace TED.Processors
                 }
             }
             return (false, null);
+        }
+
+        public void PreProcessDirectory(string dir)
+        {
         }
 
         public async Task CheckIfDirectoryHasMultipleReleases(DateTime now, string dir)
