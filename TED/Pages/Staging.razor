@@ -26,6 +26,7 @@
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x != null, false))">No Filter</MudMenuItem>
         <MudDivider />
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status == Enums.Statuses.Duplicate, false))">Duplicates</MudMenuItem>
+        <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status == Enums.Statuses.Incomplete, false))">Incomplete</MudMenuItem>        
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.TrackCount < 4, true))">Less than 3 Tracks</MudMenuItem>
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status != Enums.Statuses.Ok, false))">Needs Attention</MudMenuItem>
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x.Status == Enums.Statuses.Ok, true))">Ready to Move</MudMenuItem>
@@ -97,6 +98,7 @@
                                 <MudChip Variant="Variant.Text" Color="Color.Info">@release.Year</MudChip> @release.ReleaseData?.Text
                             </MudText>
                         </MudTooltip>
+                        <MudText Class="truncate-text" Typo="Typo.subtitle2"><MudIcon Title="Duration" Size="Size.Small" Class="pt-2" Icon="@Icons.Material.Filled.LibraryMusic" Color="Color.Info" /> @release.Status.ToString()</MudText>                        
                         <MudText Class="truncate-text" Typo="Typo.subtitle2"><MudIcon Title="Duration" Size="Size.Small" Class="pt-2" Icon="@Icons.Material.Filled.AccessTime" Color="Color.Info" /> @release.DurationTime</MudText>
                         <MudText Class="truncate-text" Typo="Typo.subtitle2"><MudIcon Title="Media Size" Size="Size.Small" Class="pt-2" Icon="@Icons.Material.Filled.AudioFile" Color="Color.Info" /> @release.FormattedMediaSize</MudText>
                     </CardHeaderContent>

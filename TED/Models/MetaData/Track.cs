@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using NodaTime;
 using TED.Enums;
 using TED.Utility;
@@ -51,6 +52,9 @@ namespace TED.Models.MetaData
         public Artist TrackArtist { get; set; }
 
         public int? TrackNumber { get; set; }
+
+        [JsonIgnore]
+        public int TrackNumberValue => TrackNumber ?? 0;
 
         public override string ToString()
         {

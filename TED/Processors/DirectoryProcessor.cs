@@ -291,6 +291,18 @@ namespace TED.Processors
                             releaseData.ProcessingMessages.Add(ProcessMessage.MakeBadMessage($"Release Artist has featuring fragments"));
                         }
                     }
+                    if(releaseData.Media?.Any() ?? false)
+                    {
+                        releaseData.Media = releaseData.Media.OrderBy(x => x.MediaNumberValue);
+                        foreach (var media in releaseData.Media.OrderBy(x => x.MediaNumberValue).Select((v, i) => new { i, v }))
+                        {
+                            if(media.v.Tracks?.Any() ?? false)
+                            {
+                                media.v.Tracks = media.v.Tracks.OrderBy(x => x.TrackNumberValue);
+                            }
+                        }
+                    }
+
                     foreach (var media in releaseData.Media.OrderBy(x => x.MediaNumber).Select((v, i) => new { i, v }))
                     {
                         foreach (var track in media.v.Tracks.OrderBy(x => x.TrackNumber).Select((t, i) => new { i, t }))
@@ -377,6 +389,19 @@ namespace TED.Processors
                             releaseData.TrackCount > 0,
                             releaseData.TrackCount > 0 ? ProcessMessage.OkCheckMark : ProcessMessage.BadCheckMark
                         ));
+                    foreach(var media in releaseData.Media)
+                    {
+                        if(media.MissingTrackNumbers.Any())
+                        {
+                            releaseData.ProcessingMessages.Add(new ProcessMessage
+                                (
+                                    $"Media [{ media.ToString()}] has Tracks missing [{ media.MissingTrackNumbers.ToCsv() }]",
+                                    false,
+                                    ProcessMessage.BadCheckMark
+                                ));       
+                            releaseData.Status = Statuses.Incomplete;                    
+                        }
+                    }
 
                     if (releaseData.ArtistThumbnail != null)
                     {
