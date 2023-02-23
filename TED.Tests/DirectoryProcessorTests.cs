@@ -49,10 +49,10 @@ namespace TED.Tests
         [DataRow("Retro", false)]
         [DataRow("Eternally Gifted", false)]
         [DataRow("Electric Deluge, Vol. 2", false)]
-        [DataRow("Experience Yourself Ep", false)]
         [DataRow("Release■Title", false)]
         [DataRow("Release💣Title", false)]
         [DataRow("The Fine Art Of Self Destruction", false)]         
+        [DataRow("Experience Yourself", false)]        
         [DataRow(null, true)]
         [DataRow("", true)]
         [DataRow(" ", true)]
@@ -80,6 +80,9 @@ namespace TED.Tests
         [DataRow("Necro Sapiens (Compilation)", true)]
         [DataRow("Captain Morgan's Revenge(Limited Japanese Editiom) (10th Anniversary Edition)", true)]
         [DataRow("Captain Morgan's Revenge (Limited Japanese Editiom) (10th Anniversary Edition)", true)]
+        [DataRow("Hard work (EP)", true)]
+        [DataRow("Hard work EP", true)]
+        [DataRow("Experience Yourself Ep", true)]        
         public void ReleaseTitleHasUnwantedText(string releaseTitle, bool shouldBe)
         {
             Assert.AreEqual(shouldBe, DirectoryProcessor.ReleaseTitleHasUnwantedText(releaseTitle));
