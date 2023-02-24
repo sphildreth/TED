@@ -67,6 +67,8 @@ namespace TED.Tests
         [DataRow("Monarch Re-mastered", true)]
         [DataRow("Monarch Release", true)]
         [DataRow("Monarch Remaster", true)]
+        [DataRow("Monarch Reissue", true)]
+        [DataRow("Monarch (REISSUE)", true)]
         [DataRow("Monarch Expanded", true)]
         [DataRow("Monarch (Expanded)", true)]
         [DataRow("Monarch (Expanded", true)]
