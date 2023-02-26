@@ -77,7 +77,9 @@
             <MudCard xs="4" Class="@($"release-{(release.IsValid ? "valid" : "invalid")} status-{release.Status.ToString().ToLower()} ma-2")">
                 <MudCardActions>
                     <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
-                        <MudIconButton OnClick="@((e) => OpenReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" />
+                        <MudTooltip Text="@release.Directory">
+                            <MudIconButton OnClick="@((e) => OpenReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.FolderOpen" Color="Color.Info" />
+                        </MudTooltip>
                         <MudIconButton OnClick="@((e) => DeleteReleaseDirectory(release.Directory))" Icon="@Icons.Material.Filled.Delete" Color="Color.Warning" />
                         <MudIconButton OnClick="@((e) => DeleteAllImagesInDirectory(release.Directory))" Icon="@Icons.Material.Filled.HideImage" Color="Color.Warning" />
                         <MudIconButton OnClick="@((e) => EditRelease(release))" Icon="@Icons.Material.Filled.Edit" Color="Color.Default" />
@@ -242,9 +244,17 @@
         if (!result.Canceled)
         {
             var di = new DirectoryInfo(dir);
-            di.Attributes = FileAttributes.Normal;
-            di.Delete(true);
-            RemoveReleaseFromLocalVariables(_releases.First(x => x.Directory == dir));
+            if(di.Exists)
+            {
+                di.Attributes = FileAttributes.Normal;
+                di.Delete(true);
+                RemoveReleaseFromLocalVariables(_releases.First(x => x.Directory == dir));
+            }
+            else
+            {
+                logger.LogWarning("Attempted to delete non-existant directory [{ dir}]", dir);
+
+            }
         }
     }
 
@@ -321,7 +331,10 @@
                     if (processResult.Item1)
                     {
                         _processingDirectoryProgress++;
-                        await InvokeAsync(StateHasChanged);
+                        if(_processingDirectoryProgress % 10 == 0)
+                        {
+                            await InvokeAsync(StateHasChanged);
+                        }
                         logger.LogInformation("Performed Magic on Release directory [{ release }]", selectedRelease);
                     }
                     else
@@ -362,7 +375,10 @@
                     Directory.Delete(selectedRelease.Directory, true);
                     RemoveReleaseFromLocalVariables(selectedRelease);
                     _processingDirectoryProgress++;
-                    await InvokeAsync(StateHasChanged);
+                    if(_processingDirectoryProgress % 10 == 0)
+                    {
+                        await InvokeAsync(StateHasChanged);
+                    }
                     logger.LogInformation("Deleted Release directory [{ dir }]", selectedRelease.Directory);
                 }
                 catch (Exception ex)
@@ -385,16 +401,20 @@
         _directorysFound = selectedReleases.Count();
         _processingDirectoryProgress = 0;
         var now = DateTime.UtcNow;
-        var saveProcessor = new ReleaseSaveProcessor(ReleaseSaveProcessorLogger);
+        var sw = new System.Diagnostics.Stopwatch();
         await Parallel.ForEachAsync(selectedReleases, async (selectedRelease, cancellationToken) =>
         {
             try
             {
-                await saveProcessor.ProcessAsync(now, selectedRelease);
+                sw.Restart();
                 DirectoryProcessor.MoveFolder(selectedRelease.Directory, Path.Combine(inboundDirectory, new DirectoryInfo(selectedRelease.Directory).Name));
                 _processingDirectoryProgress++;
-                await InvokeAsync(StateHasChanged);
-                logger.LogInformation("Moved [{ dir }] to inbound [{ inbound }]", selectedRelease.Directory, inboundDirectory);
+                if(_processingDirectoryProgress % 10 == 0)
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+                sw.Stop();
+                logger.LogInformation("Moved [{ dir }] to inbound [{ inbound }] elapsed time [{ elapsedTime }]", selectedRelease.Directory, inboundDirectory, sw.ElapsedMilliseconds);
 
             }
             catch (Exception ex)
