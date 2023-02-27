@@ -15,6 +15,8 @@ namespace TED.Processors
 {
     public sealed class DirectoryProcessor
     {
+        private static readonly string YearParseRegex = "(19|20)\\d{2}";
+
         public const int MaximumDiscNumber = 500;
 
         public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(ep|bonus|release|re(\-*)issue|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web|\(320\)|\(*compilation\)*)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -490,7 +492,7 @@ namespace TED.Processors
                         fileAtl.TrackNumber = readerTrack.TrackNumber;
                         fileAtl.TrackTotal = theReader.Tracks.Count();
                         fileAtl.Genre = readerTrack.Genre;
-                        fileAtl.Year = SafeParser.ToDateTime(cueSheet.Date)?.Year ?? throw new Exception("Invalid Release year");
+                        fileAtl.Year = SafeParser.ToDateTime(cueSheet.Date)?.Year ?? TryToGetYearFromString(CUEFileForReleaseDirectory) ?? throw new Exception("Invalid Release year");
                         var trackArtist = readerTrack.Artist.Nullify();
                         if (trackArtist != null && !StringExt.DoStringsMatch(releaseArtist, trackArtist))
                         {
@@ -1159,6 +1161,19 @@ namespace TED.Processors
             {
                 DeleteFolderIfEmpty(new DirectoryInfo(subDir));
             }
+        }
+
+        public static int? TryToGetYearFromString(string input)
+        {
+            if (input.Nullify() == null)
+            {
+                return null;
+            }
+            if(Regex.IsMatch(input, YearParseRegex, RegexOptions.RightToLeft))
+            {
+                return SafeParser.ToNumber<int?>(Regex.Match(input, YearParseRegex, RegexOptions.RightToLeft).Value);
+            }
+            return null;
         }
     }
 }

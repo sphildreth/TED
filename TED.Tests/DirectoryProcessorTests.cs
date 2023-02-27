@@ -223,5 +223,20 @@ namespace TED.Tests
             Assert.AreEqual(shouldBe, DirectoryProcessor.IsImageAProofType(new FileInfo(text)));
         }
 
+        
+        [TestMethod]
+        [DataRow(null, null)]
+        [DataRow("", null)]
+        [DataRow("Bob", null)]
+        [DataRow("09/Bob Rocks", null)]        
+        [DataRow("Bob Rocks", null)]        
+        [DataRow("/Discography 2001-2010/2009/Bob Rocks", 2009)]
+        [DataRow("2009/Bob Rocks", 2009)]
+        [DataRow("2009 Bob Rocks", 2009)]
+        [DataRow("2009", 2009)]
+        public void TryToGetYearFromString(string input, int? shouldBe)
+        {
+            Assert.AreEqual(shouldBe, DirectoryProcessor.TryToGetYearFromString(input));
+        }
     }
 }
