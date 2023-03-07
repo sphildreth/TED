@@ -117,21 +117,15 @@ namespace TED.Processors
                     }
                 }
                 var tagsFilesFound = allfileAtlsFound.Where(x => IsATLTrackForMP3(x));
-                if (allfileAtlsFound.Any(x => x.AudioFormat.ID > -1))
+                var cueCheckResult = await CheckIfDirectoryHasCueFile(dir, _logger);
+                if (cueCheckResult.Item1)
                 {
-                    var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => ShouldMediaTrackBeConverted(x));
-                    if (doesReleaseHaveNonMp3Tracks)
-                    {
-                        var cueCheckResult = await CheckIfDirectoryHasCueFile(dir, _logger);
-                        if (cueCheckResult.Item1)
-                        {
-                            tagsFilesFound = cueCheckResult.Item2;
-                        }
-                        else
-                        {
-                            tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound.OrderBy(x => x.TrackNumber));
-                        }
-                    }
+                    tagsFilesFound = cueCheckResult.Item2;
+                }                
+                var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => ShouldMediaTrackBeConverted(x));
+                if (doesReleaseHaveNonMp3Tracks)
+                {
+                    tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound.OrderBy(x => x.TrackNumber));
                 }
                 if(!tagsFilesFound.Any())
                 {

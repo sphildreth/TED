@@ -467,6 +467,7 @@
                 var filesInDirectory = Directory.GetFiles(dir, "*.*", SearchOption.TopDirectoryOnly);
                 if (filesInDirectory.Any())
                 {
+                    // Here a release with media sub folders like "CD01" and "CD02" will get processed
                     releaseForDirectory = (await directoryProcessor.ProcessAsync(now, dir, filesInDirectory)).Adapt<StagingRelease>();
                     if (releaseForDirectory != null)
                     {
@@ -486,23 +487,21 @@
                         break;
                     }
                 }
+                // Now look for any subfolder in the dir that each hold a release and potentially having their own media sub folders like "CD01" or "CD02"
                 foreach (var subDir in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
                 {
                     try
                     {
                         logger.LogDebug("Scanning [{ folder }] Directory [{ subDir }]", dir, subDir);
-                        if(await DirectoryProcessor.ProcessSubDirectory(dir, new DirectoryInfo(subDir), _directoryProcessorLogger))
+                        releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, Directory.GetFiles(subDir))).Adapt<StagingRelease>();
+                        if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
                         {
-                            releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, Directory.GetFiles(subDir))).Adapt<StagingRelease>();
-                            if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
-                            {
-                                releaseForDirectory.Selected = releaseForDirectory.IsValid;
-                                _releases.Add(releaseForDirectory);
-                                sw.Stop();
-                                StateHasChanged();
-                                logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
-                                sw.Restart();
-                            }
+                            releaseForDirectory.Selected = releaseForDirectory.IsValid;
+                            _releases.Add(releaseForDirectory);
+                            sw.Stop();
+                            StateHasChanged();
+                            logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
+                            sw.Restart();
                         }
                         if (_releases.Count() >= StagingDirectoryScanLimit)
                         {
