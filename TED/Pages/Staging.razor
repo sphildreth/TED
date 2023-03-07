@@ -296,8 +296,18 @@
         }
     }
 
+    void UnselectAllReleases()
+    {
+        foreach (var r in _allReleases)
+        {
+            r.Selected = false;
+        }
+        _releases = _allReleases.ToList();
+    }
+
     void FilterReleases(Func<StagingRelease, bool> filter, bool select)
     {
+        UnselectAllReleases();
         _releases = _allReleases.Where(filter).ToList();
         foreach (var r in _releases)
         {
