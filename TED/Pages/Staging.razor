@@ -21,7 +21,7 @@
     <MudPaper Height="38px" Class="d-flex justify-space-around mr-2" Elevation="0">
         <MudProgressLinear Vertical="true" Striped="true" Color="Color.Primary" Size="Size.Small" Max="@_directorysFound" Value="@_processingDirectoryProgress" />
     </MudPaper>
-    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.ScreenSearchDesktop" Color="Color.Info" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.ScreenSearchDesktop" Color="Color.Default" Size="Size.Medium" OnClick="@( async (e) => await DoScan())">Scan</MudButton>
     <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Filter" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Filter">
         <MudMenuItem OnClick="@( (e) => FilterReleases(x => x != null, false))">No Filter</MudMenuItem>
         <MudDivider />
@@ -36,6 +36,13 @@
         <MudMenuItem OnClick="@( (e) => ToggleSelected(true))">Select All</MudMenuItem>
         <MudMenuItem OnClick="@( (e) => ToggleSelected(false))">Select None</MudMenuItem>
     </MudMenu>
+    <MudMenu Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Sort" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Color="Color.Info" Size="Size.Medium" Label="Sort">
+        <MudMenuItem Icon="@sortingIcon(0)"  OnClick="@( (e) => SortReleases(x => x.Index, 0))">By Index</MudMenuItem>
+        <MudMenuItem Icon="@sortingIcon(1)"  OnClick="@( (e) => SortReleases(x => x.Artist.Text, 1))">Artist</MudMenuItem>
+        <MudMenuItem Icon="@sortingIcon(2)"  OnClick="@( (e) => SortReleases(x => x.ReleaseData.Text, 2))">Release</MudMenuItem>               
+        <MudMenuItem Icon="@sortingIcon(3)"  OnClick="@( (e) => SortReleases(x => x.Year, 3))">Year</MudMenuItem>               
+
+    </MudMenu>        
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.DriveFileMove" Color="Color.Info" Size="Size.Medium" OnClick="@((e) => MoveCheckedToInbound())">To Inbound</MudButton>
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete" Color="Color.Warning" Size="Size.Medium" OnClick="@((e) => DeleteChecked())">Delete</MudButton>
     <MudButton Disabled="@(!_releases.Any(x => x.Selected))" Class="ml-3" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AutoAwesome" Color="Color.Secondary" Size="Size.Medium" OnClick="@((e) => DoMagic())">Do Magic</MudButton>
@@ -140,10 +147,22 @@
     public sealed class StagingRelease : Release
     {
         public bool Selected { get; set; }
+        public int Index {get; set;}
     }
 
     bool _scanning = false;
     bool _movingFolders = false;
+    int _sortingBy = 0;
+
+    string sortingIcon(int selectedSortingBy)
+    {
+        if(_sortingBy == selectedSortingBy)
+        {
+            return Icons.Material.Filled.CheckBox;
+        }
+        return Icons.Material.Filled.CheckBoxOutlineBlank;
+    }
+
     List<StagingRelease> _releases = new List<StagingRelease>();
     List<StagingRelease> _allReleases = new List<StagingRelease>();
     int _directorysFound = 0;
@@ -315,6 +334,12 @@
         }
     }
 
+    void SortReleases(Func<StagingRelease, object> sortBy, int _setSortingBy)
+    {
+        _releases = _allReleases.OrderBy(sortBy).ToList();
+        _sortingBy = _setSortingBy;
+    }
+
     async Task DoMagic()
     {
         var parameters = new DialogParameters();
@@ -484,6 +509,7 @@
                         if (releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
                         {
                             releaseForDirectory.Selected = releaseForDirectory.IsValid;
+                            releaseForDirectory.Index = _releases.Count() + 1;
                             _releases.Add(releaseForDirectory);
                             sw.Stop();
                             StateHasChanged();
@@ -507,6 +533,7 @@
                         if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
                         {
                             releaseForDirectory.Selected = releaseForDirectory.IsValid;
+                            releaseForDirectory.Index = _releases.Count() + 1;
                             _releases.Add(releaseForDirectory);
                             sw.Stop();
                             StateHasChanged();
