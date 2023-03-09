@@ -18,6 +18,8 @@ namespace TED.Processors
     {
         private static readonly string YearParseRegex = "(19|20)\\d{2}";
 
+        public const short MinimumDiscNumber = 1;
+
         public const int MaximumDiscNumber = 500;
 
         public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(ep|bonus|release|re(\-*)issue|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web|\(320\)|\(*compilation\)*)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -215,13 +217,17 @@ namespace TED.Processors
                         releaseData.ProcessingMessages.Add(new ProcessMessage("CoverImage not found.", false, ProcessMessage.BadCheckMark));
                     }
                     var medias = new List<ReleaseMedia>();
-                    foreach (var mp3TagData in tagsFilesFound.OrderBy(x => x.DiscNumber).GroupBy(x => x.DiscNumber))
+                    foreach (var mp3TagData in tagsFilesFound.OrderBy(x => x.DisNumberValue()).GroupBy(x => x.DisNumberValue()))
                     {
                         var mediaTracks = tagsFilesFound.Where(x => x.DiscNumber == mp3TagData.Key);
-                        var mediaNumber = SafeParser.ToNumber<short?>(mp3TagData.Key) ?? 0;
+                        var mediaNumber = SafeParser.ToNumber<short?>(mp3TagData.Key) ?? 1;
+                        if(mediaNumber < 1)
+                        {
+                            mediaNumber = 1;
+                        }
                         medias.Add(new ReleaseMedia
                         {
-                            MediaNumber = mediaNumber < 1 ? SafeParser.ToNumber<short>(1) : mediaNumber,
+                            MediaNumber = mediaNumber,
                             TrackCount = mediaTracks.Count(),
                             SubTitle = mp3TagData.First().SeriesTitle,
                             Tracks = mediaTracks.OrderBy(x => x.TrackNumber).Select(x => new Track
