@@ -1,6 +1,7 @@
 ﻿using ATL.CatalogDataReaders;
 using FFMpegCore;
 using System.Collections.Concurrent;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using TED.Enums;
@@ -438,15 +439,41 @@ namespace TED.Processors
             var CUEFileForReleaseDirectory = isrcCueSheets.FirstOrDefault();
             if (CUEFileForReleaseDirectory != null)
             {
-                ICatalogDataReader theReader;
+                ICatalogDataReader theReader = null;
                 try
                 {
                     theReader = CatalogDataReaderFactory.GetInstance().GetCatalogDataReader(CUEFileForReleaseDirectory);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError("Error reading CUE [{ CUEFileForReleaseDirectory }] [{ex}", CUEFileForReleaseDirectory, ex.ToString());
-                    return (false, null);
+                    var throwError = true;
+                    if(ex.Message.Contains("1252") && 
+                       ex.Message.Contains("encoding name"))
+                    {
+                       // Encoding wind1252 = Encoding.GetEncoding(1252);
+                        Encoding wind1252 = CodePagesEncodingProvider.Instance.GetEncoding(1252);
+                        byte[] wind1252Bytes = SafeParser.ReadFile(CUEFileForReleaseDirectory);
+                        byte[] utf8Bytes = Encoding.Convert(wind1252, Encoding.UTF8, wind1252Bytes);
+                        var newCueFilename = Path.ChangeExtension(CUEFileForReleaseDirectory, "temp");
+                        await File.WriteAllBytesAsync(newCueFilename, utf8Bytes);
+                        File.Delete(CUEFileForReleaseDirectory);
+                        File.Move(newCueFilename, CUEFileForReleaseDirectory);
+                        try
+                        {
+                            theReader = CatalogDataReaderFactory.GetInstance().GetCatalogDataReader(CUEFileForReleaseDirectory);
+                            throwError = false;                            
+                        }
+                        catch (System.Exception ex2)
+                        {
+                            logger.LogError("Error reading CUE [{ CUEFileForReleaseDirectory }] [{ex2}", CUEFileForReleaseDirectory, ex2.ToString());
+                            return (false, null);
+                        }
+                    }
+                    if(throwError)
+                    {
+                        logger.LogError("Error reading CUE [{ CUEFileForReleaseDirectory }] [{ex}", CUEFileForReleaseDirectory, ex.ToString());
+                        return (false, null);
+                    }
                 }
                 if (theReader != null)
                 {
@@ -564,6 +591,29 @@ namespace TED.Processors
             var processingFoundNewFiles = false;
             try
             {
+                // Move any release and secondary release images up one 
+                if(IsCoverImagesDirectory(subDirectory.FullName))
+                {
+                    var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
+                    coverImages.AddRange((ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.ReleaseSecondary) ?? Enumerable.Empty<FileInfo>()));
+                    if (coverImages?.Any() ?? false)
+                    {
+                        Parallel.ForEach(coverImages, coverImage =>
+                        {
+                            try
+                            {
+                                File.SetAttributes(coverImage.FullName, FileAttributes.Normal);
+                                File.Move(coverImage.FullName, Path.Combine(subDirectory.Parent.FullName, coverImage.Name), true);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
+                            }
+                        });
+                        processingFoundNewFiles = true;
+                    }
+                } 
+
                 var subDirectoryFiles = subDirectory.GetFiles("*.mp3", SearchOption.TopDirectoryOnly);
                 // If the subdir is a media folder (like "CD01") then move the media files from the sub directory up one with media name
                 if (IsDirectoryMediaDirectory(releaseDirectory, subDirectory.FullName))
@@ -593,30 +643,12 @@ namespace TED.Processors
                             }
                         });
                         processingFoundNewFiles = true;
-                    }
-                    var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
-                    coverImages.AddRange((ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.ReleaseSecondary) ?? Enumerable.Empty<FileInfo>()));
-                    if (coverImages?.Any() ?? false)
-                    {
-                        Parallel.ForEach(coverImages, coverImage =>
-                        {
-                            try
-                            {
-                                File.SetAttributes(coverImage.FullName, FileAttributes.Normal);
-                                File.Move(coverImage.FullName, Path.Combine(subDirectory.Parent.FullName, coverImage.Name), true);
-                            }
-                            catch (Exception ex)
-                            {
-                                logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
-                            }
-                        });
-                        processingFoundNewFiles = true;
-                    }
+                    }                    
                 }
                 else
                 {
                     processingFoundNewFiles = subDirectoryFiles.Any();
-                }
+                }               
                 if((await CheckIfDirectoryHasCueFile(subDirectory.FullName, logger)).Item1)
                 {
                     subDirectoryFiles = subDirectory.GetFiles("*.mp3", SearchOption.TopDirectoryOnly);
@@ -1074,6 +1106,7 @@ namespace TED.Processors
                 var dirDir = new DirectoryInfo(dir);
                 if (Fastenshtein.Levenshtein.Distance(rdDir.Name, dirDir.Name) < 15)
                 {
+                    Console.WriteLine($"IsDirectoryMediaDirectory determined that [{ releaseDirectory }] is a Media Directory");
                     return true;
                 }
             }

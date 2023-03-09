@@ -136,6 +136,7 @@ namespace TED.Tests
         [DataRow("Release Title CD", false)]
         [DataRow("2001 - Preflyte Sessions (2-CD)", false)]
         [DataRow("America-Original Album Series (5CD Box)\\1971 America", false)]
+        [DataRow("1985 - Bonded By Blood (Remaster) (Century Media, 9962122, Germany, 2008)", false)]
         public void IsDirectoryMediaDirectory(string directory, bool shouldBe)
         {
             Assert.AreEqual(shouldBe, DirectoryProcessor.IsDirectoryMediaDirectory(null, directory));
