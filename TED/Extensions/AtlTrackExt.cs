@@ -9,7 +9,7 @@ namespace TED.Extensions
             return new FileInfo(track.Path);
         }
 
-        public static short DisNumberValue(this ATL.Track track)
+        public static short DiskNumberValue(this ATL.Track track)
         {
             var r = SafeParser.ToNumber<short?>(track.DiscNumber) ?? 1;
             return r < Processors.DirectoryProcessor.MinimumDiscNumber ? Processors.DirectoryProcessor.MinimumDiscNumber : r;

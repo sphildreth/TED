@@ -166,7 +166,7 @@ namespace TED.Processors
                         Directory = dir,
                         CreatedDate = now,
                         Id = Guid.NewGuid(),
-                        MediaCount = tagsFilesFound.Select(x => x.DiscNumber ?? 0).Distinct().Count(),
+                        MediaCount = tagsFilesFound.Select(x => x.DiskNumberValue()).Distinct().Count(),
                         ReleaseDateDateTime = releaseDate,
                         Year = releaseDate?.Year,
                         Status = Enums.Statuses.New,
@@ -217,9 +217,9 @@ namespace TED.Processors
                         releaseData.ProcessingMessages.Add(new ProcessMessage("CoverImage not found.", false, ProcessMessage.BadCheckMark));
                     }
                     var medias = new List<ReleaseMedia>();
-                    foreach (var mp3TagData in tagsFilesFound.OrderBy(x => x.DisNumberValue()).GroupBy(x => x.DisNumberValue()))
+                    foreach (var mp3TagData in tagsFilesFound.OrderBy(x => x.DiskNumberValue()).GroupBy(x => x.DiskNumberValue()))
                     {
-                        var mediaTracks = tagsFilesFound.Where(x => x.DiscNumber == mp3TagData.Key);
+                        var mediaTracks = tagsFilesFound.Where(x => x.DiskNumberValue() == mp3TagData.Key);
                         var mediaNumber = SafeParser.ToNumber<short?>(mp3TagData.Key) ?? 1;
                         if(mediaNumber < 1)
                         {
@@ -634,9 +634,9 @@ namespace TED.Processors
                                 try
                                 {
                                     var mediaNumber = fileAtl.DiscNumber ?? DetermineMediaNumberFromDirectory(subDirectory.Name);
-                                    if ((mediaNumber ?? 0) < 1)
+                                    if ((mediaNumber ?? 0) < MinimumDiscNumber)
                                     {
-                                        mediaNumber = 1;
+                                        mediaNumber = fileAtl.DiskNumberValue();
                                     }
                                     File.SetAttributes(subDirectoryFile.FullName, FileAttributes.Normal);
                                     var newMediaFileName = Path.Combine(subDirectory.Parent.FullName, $"m{mediaNumber.ToStringPadLeft(3)} {subDirectoryFile.Name}");

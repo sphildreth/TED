@@ -1,0 +1,104 @@
+@page "/configuration"
+
+@using FluentValidation
+@using Microsoft.Extensions.Options;
+
+@inject IDialogService DialogService
+@inject NavigationManager UriHelper
+@inject ILogger<Staging> logger
+@inject ILoggerFactory LoggerFactory
+@inject IOptions<TED.Models.Configuration> TEDConfiguration
+
+<PageTitle>TED Configuration</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudCard>
+            <MudForm Model="@_configModel" @ref="@form" Validation="@(configurationValidator.ValidateValue)" ValidationDelay="0">
+                <MudCardContent>
+                    <MudTextField @bind-Value="_configModel.InboundDirectory"
+                                  For="@(() => _configModel.InboundDirectory)"
+                                  Immediate="true"
+                                  Label="Inbound Directory" />
+                    <MudTextField @bind-Value="_configModel.StagingDirectory"
+                                  For="@(() => _configModel.StagingDirectory)"
+                                  Immediate="true"
+                                  Label="Staging Directory" />                
+                </MudCardContent>
+            </MudForm>
+            <MudCardActions>
+                <MudButton Disabled="@_submitted" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="@(async () => await Submit())">Save</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Inject]
+    ISnackbar Snackbar { get; set; }
+    string[] errors = { };
+    MudForm form;
+    bool _submitted = false;
+
+    Models.Configuration _configModel = new Models.Configuration();
+
+    ConfigurationFluentValidator configurationValidator = new ConfigurationFluentValidator();
+
+    /// <summary>
+    /// A standard AbstractValidator which contains multiple rules and can be shared with the back end API
+    /// </summary>
+    /// <typeparam name="Release"></typeparam>
+    public class ConfigurationFluentValidator : AbstractValidator<Models.Configuration>
+    {
+        public ConfigurationFluentValidator()
+        {
+            RuleFor(x => x.InboundDirectory)
+                .NotEmpty();
+
+            RuleFor(x => x.StagingDirectory)
+                .NotEmpty();
+
+        }
+
+        public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>
+         {
+             var result = await ValidateAsync(ValidationContext<Models.Configuration>.CreateWithOptions((Models.Configuration)model, x => x.IncludeProperties(propertyName)));
+             if (result.IsValid)
+             {
+                 return Array.Empty<string>();
+             }
+             return result.Errors.Select(e => e.ErrorMessage);
+         };
+    }    
+
+    protected override async Task OnInitializedAsync()
+    {
+        _configModel = new Models.Configuration 
+        { 
+            InboundDirectory = TEDConfiguration.Value.InboundDirectory,
+            StagingDirectory = TEDConfiguration.Value.StagingDirectory
+        };
+        await Task.CompletedTask;
+    }    
+
+    public async Task Submit()
+    {
+        await form.Validate();
+
+        if (form.IsValid)
+        {
+            _submitted = true;
+            @* if(!result.Item1)
+            {
+                errors = result.Item2.ToArray();
+                Snackbar.Add("Error saving", MudBlazor.Severity.Error);
+                _submitted = false;
+            }
+            else
+            {
+                Snackbar.Add("Saved!");
+            } *@
+        }
+    }    
+
+}    
