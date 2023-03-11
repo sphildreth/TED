@@ -22,9 +22,11 @@ namespace TED.Processors
 
         public const int MaximumDiscNumber = 500;
 
-        public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(ep|bonus|release|re(\-*)issue|re(\-*)master|re(\-*)mastered|anniversary|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web|\(320\)|\(*compilation\)*)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        public static readonly Regex UnwantedReleaseTitleTextRegex = new(@"(\s*(-\s)*((CD[_\-#\s]*[0-9]*)))|(\s[\[\(]*(ep|bonus|release|re(\-*)issue|re(\-*)master|re(\-*)mastered|anniversary|single|cd|disc|deluxe|digipak|digipack|vinyl|japan(ese)*|asian|remastered|limited|ltd|expanded|edition|web|\(320\)|\(*compilation\)*)+(]|\)*))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static readonly Regex UnwantedTrackTitleTextRegex = new(@"(\s{2,}|(\s\(prod\s))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        public static readonly Regex IsDirectoryNotStudioAlbumsRegex = new(@"(single(s)*|compilation(s*)|live|promo(s*)|demo)", RegexOptions.Compiled | RegexOptions.IgnoreCase); 
 
         public static readonly Regex HasFeatureFragmentsRegex = new(@"(\s[\(\[]*ft[\s\.]|\s*[\(\[]*feat[\s\.]|[\(\[]*featuring)+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -170,6 +172,7 @@ namespace TED.Processors
                         ReleaseDateDateTime = releaseDate,
                         Year = releaseDate?.Year,
                         Status = Enums.Statuses.New,
+                        IsStudioAlbumType = IsDirectoryNotStudioAlbums(dir),
                         TrackCount = groupedByRelease.First().TrackTotal
                     };
                     var firstAtlHasArtistImage = firstAtl.EmbeddedPictures?.FirstOrDefault(x => x.PicType == ATL.PictureInfo.PIC_TYPE.Artist ||
@@ -930,6 +933,15 @@ namespace TED.Processors
                 return true;
             }
             return false;
+        }
+
+        public static bool IsDirectoryNotStudioAlbums(string dir)
+        {
+            if (string.IsNullOrWhiteSpace(dir))
+            {
+                return false;
+            }
+            return !IsDirectoryNotStudioAlbumsRegex.IsMatch(dir);
         }
 
         public static bool TrackHasUnwantedText(string releaseTitle, string trackTitle, int? trackNumber)

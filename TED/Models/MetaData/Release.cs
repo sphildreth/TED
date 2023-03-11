@@ -120,6 +120,8 @@ namespace TED.Models.MetaData
 
         public Statuses Status { get; set; } = Statuses.Incomplete;
 
+        public bool IsStudioAlbumType {get;set;} = true;
+
         [JsonIgnore]
         public List<ProcessMessage> ProcessingMessages { get; set; } = new List<ProcessMessage>();
     }

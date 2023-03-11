@@ -85,6 +85,9 @@ namespace TED.Tests
         [DataRow("Hard work (EP)", true)]
         [DataRow("Hard work EP", true)]
         [DataRow("Experience Yourself Ep", true)]        
+        [DataRow("Experience Yourself (Single)", true)]        
+        [DataRow("Escape (Deluxe Edition)", true)]        
+        [DataRow("Escape (Deluxe)", true)]        
         public void ReleaseTitleHasUnwantedText(string releaseTitle, bool shouldBe)
         {
             Assert.AreEqual(shouldBe, DirectoryProcessor.ReleaseTitleHasUnwantedText(releaseTitle));
@@ -238,6 +241,22 @@ namespace TED.Tests
         public void TryToGetYearFromString(string input, int? shouldBe)
         {
             Assert.AreEqual(shouldBe, DirectoryProcessor.TryToGetYearFromString(input));
+        }
+
+        [TestMethod]
+        [DataRow(null, false)]
+        [DataRow("", false)]
+        [DataRow("Albums", true)]
+        [DataRow("Studio Albums", true)]
+        [DataRow("Stuff", true)]        
+        [DataRow("Singles", false)]
+        [DataRow("Demos", false)]
+        [DataRow("02 Singles", false)]
+        [DataRow("Compilations", false)]
+        [DataRow("Live Albums", false)]
+        public void IsDirectoryNotStudioAlbums(string input, bool shouldBe)
+        {
+            Assert.AreEqual(shouldBe, DirectoryProcessor.IsDirectoryNotStudioAlbums(input));
         }
     }
 }

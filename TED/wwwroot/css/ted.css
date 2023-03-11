@@ -52,3 +52,7 @@
 .track-list-artist {
     font-size: 10px;
 }
+
+.is-studio-albumtype-false :is(h6) { 
+    font-style: italic;
+}
