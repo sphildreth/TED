@@ -600,7 +600,7 @@ namespace TED.Processors
             var processingFoundNewFiles = false;
             try
             {
-                // Move any release and secondary release images up one 
+                // If the subdir is a image directory then move any release and secondary release images up one 
                 if(IsCoverImagesDirectory(subDirectory.FullName))
                 {
                     var coverImages = (ImageHelper.FindImageTypeInDirectory(subDirectory, ImageType.Release) ?? Enumerable.Empty<FileInfo>()).ToList();
@@ -1118,17 +1118,27 @@ namespace TED.Processors
             {
                 return false;
             }
-            if (releaseDirectory.Nullify() != null)
+            if(Regex.IsMatch(dir, $"(\\s*(CD[.\\S]*[0-9])|(CD\\s[0-9])+)", RegexOptions.IgnoreCase))
             {
-                var rdDir = new DirectoryInfo(releaseDirectory);
-                var dirDir = new DirectoryInfo(dir);
-                if (Fastenshtein.Levenshtein.Distance(rdDir.Name, dirDir.Name) < 15)
+                return true;
+            }
+            return DoesDirectoryHaveMediaFiles(dir);
+        }
+
+        public static bool DoesDirectoryHaveMediaFiles(string dir)
+        {
+            if (dir.Nullify() == null)
+            {
+                return false;
+            }
+            foreach(var file in Directory.EnumerateFiles(dir, "*.*"))
+            {
+                if(IsATLTrackForMP3(new ATL.Track(file)))
                 {
-                    Console.WriteLine($"IsDirectoryMediaDirectory determined that [{ releaseDirectory }] is a Media Directory");
                     return true;
                 }
             }
-            return Regex.IsMatch(dir, $"(\\s*(CD[.\\S]*[0-9])|(CD\\s[0-9])+)", RegexOptions.IgnoreCase);
+            return false;
         }
 
         public static void DeleteDirectory(string target_dir)

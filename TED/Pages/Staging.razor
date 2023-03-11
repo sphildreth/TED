@@ -524,7 +524,6 @@
                         break;
                     }
                 }
-                // Now look for any subfolder in the dir that each hold a release and potentially having their own media sub folders like "CD01" or "CD02"
                 foreach (var subDir in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
                 {
                     try
@@ -566,6 +565,11 @@
 
     void MarkDuplicates()
     {
+        // Reset any existing Duplicate marked as may have been delected and will get remarked as Duplicate if found below
+        foreach(var dup in _releases.Where(x => x.Status == Enums.Statuses.Duplicate))
+        {
+            dup.Status = Enums.Statuses.NeedsAttention;
+        }
         var duplicates = _releases.GroupBy(x => x.ReleaseData?.Text);
         if(duplicates.Count() > 1)
         {
