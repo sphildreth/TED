@@ -7,8 +7,9 @@ namespace TED.Models.CueSheet.Parsers
         public FileLineSingleValueParser(FileLine line)
         {
             if (line == null)
+            {
                 throw new ArgumentNullException("line");
-
+            }
             _line = line;
         }
 

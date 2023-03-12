@@ -1,4 +1,6 @@
-﻿namespace TED.Models.CueSheet.Parsers
+﻿using TED.Utility;
+
+namespace TED.Models.CueSheet.Parsers
 {
     public class FileLineTrackParser : IParser<Track>
     {
@@ -16,7 +18,7 @@
         {
             return new Track
             {
-                TrackNum = int.Parse(_line.RawParts[1]),
+                TrackNum = SafeParser.ToNumber<int>(_line.RawParts[1]),
                 TrackType = _line.RawParts[2]
             };
         }

@@ -1,4 +1,6 @@
-﻿namespace TED.Models.CueSheet.Parsers
+﻿using TED.Utility;
+
+namespace TED.Models.CueSheet.Parsers
 {
     public class FileLineIndexParser : IParser<Index>
     {
@@ -16,7 +18,7 @@
         {
             return new Index
             {
-                IndexNum = byte.Parse(_line.RawParts[1]),
+                IndexNum = SafeParser.ToNumber<byte>(_line.RawParts[1]),
                 IndexTime = new IndexTime(_line.RawParts.Last())
             };
         }

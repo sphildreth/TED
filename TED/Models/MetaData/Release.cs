@@ -63,7 +63,10 @@ namespace TED.Models.MetaData
         {
             get
             {
-                return SafeParser.ToNumber<long>(Media?.SelectMany(x => x.Tracks).Sum(x => x.FileSize) ?? 0).FormatFileSize();
+                return SafeParser.ToNumber<long>(Media?.SelectMany(x => x.Tracks)?
+                                                       .Where(x => x.FileSize != null)?
+                                                       .Sum(x => x.FileSize) ?? 0)
+                                                       .FormatFileSize();
             }
         }
 
