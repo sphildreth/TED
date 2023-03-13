@@ -106,15 +106,17 @@ namespace TED.Tests
         [TestMethod]
         [DataRow(null, false)]
         [DataRow("Something", false)]
-        [DataRow("Something With Bob", false)]
+        [DataRow("Eternally Gifted", false)]
+        [DataRow("Shift Scene", false)]
+        [DataRow("Something With Bob", true)]
         [DataRow("Something Ft Bob", true)]
         [DataRow("Something ft Bob", true)]
         [DataRow("Something Ft. Bob", true)]
         [DataRow("Something (Ft. Bob)", true)]
         [DataRow("Something Feat. Bob", true)]
         [DataRow("Something Featuring Bob", true)]
-        [DataRow("Eternally Gifted", false)]
-        [DataRow("Shift Scene", false)]
+        [DataRow("Something (with Bob)", true)]
+        [DataRow("Minds Without Fear with Vishal-Shekhar", true)]
         public void StringHasFeaturingFragments(string input, bool shouldBe)
         {
             Assert.AreEqual(DirectoryProcessor.StringHasFeaturingFragments(input), shouldBe);
@@ -140,6 +142,7 @@ namespace TED.Tests
         [DataRow("2001 - Preflyte Sessions (2-CD)", false)]
         [DataRow("America-Original Album Series (5CD Box)\\1971 America", false)]
         [DataRow("1985 - Bonded By Blood (Remaster) (Century Media, 9962122, Germany, 2008)", false)]
+        [DataRow("2021 - Immortal  (Instrumental)", false)]
         public void IsDirectoryMediaDirectory(string directory, bool shouldBe)
         {
             Assert.AreEqual(shouldBe, DirectoryProcessor.IsDirectoryMediaDirectory(null, directory));

@@ -385,6 +385,7 @@
             });
             _processingDirectoryProgress = 0;
             _movingFolders = false;
+            logger.LogDebug("** Magic Completed. Processed [{ releaseCount }] Releases. Elapsed Time [{ elapsedTime }]", _releases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);
             await DoScan();
         }
     }
@@ -400,6 +401,7 @@
         var result = await dialog.Result;
         if (!result.Canceled)
         {
+            var now = DateTime.UtcNow;
             _movingFolders = true;
             var selectedReleases = _releases.Where(x => x.Selected).ToArray();
             _directorysFound = selectedReleases.Count();
@@ -426,6 +428,7 @@
             _processingDirectoryProgress = 0;
             StateHasChanged();
             _movingFolders = false;
+            logger.LogDebug("** Deleting Completed. Deleted [{ releaseCount }] Releases. Elapsed Time [{ elapsedTime }]", selectedReleases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);            
         }
     }
 
@@ -438,6 +441,7 @@
         _processingDirectoryProgress = 0;
         var now = DateTime.UtcNow;
         var sw = new System.Diagnostics.Stopwatch();
+        logger.LogInformation("Moving [{ releaseCount }] Releases to inbound [{ inbound }]", selectedReleases.Count(), inboundDirectory);
         await Parallel.ForEachAsync(selectedReleases, async (selectedRelease, cancellationToken) =>
         {
             try
@@ -462,6 +466,7 @@
         _processingDirectoryProgress = 0;
         StateHasChanged();
         _movingFolders = false;
+        logger.LogDebug("** Moving Completed. Moved [{ selectedReleases }] Releases. Elapsed Time [{ elapsedTime }]", selectedReleases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);        
         await DoScan();
     }
 
