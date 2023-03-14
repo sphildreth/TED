@@ -442,7 +442,7 @@
         var now = DateTime.UtcNow;
         var sw = new System.Diagnostics.Stopwatch();
         logger.LogInformation("Moving [{ releaseCount }] Releases to inbound [{ inbound }]", selectedReleases.Count(), inboundDirectory);
-        await Parallel.ForEachAsync(selectedReleases, async (selectedRelease, cancellationToken) =>
+        foreach(var selectedRelease in selectedReleases)
         {
             try
             {
@@ -462,7 +462,7 @@
                 logger.LogError(ex, "Error Moving Release directory [{ dir }]", selectedRelease.Directory);
 
             }
-        });
+        }
         _processingDirectoryProgress = 0;
         StateHasChanged();
         _movingFolders = false;
