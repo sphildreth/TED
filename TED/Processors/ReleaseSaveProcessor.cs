@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using TED.Extensions;
 using TED.Models.MetaData;
 
@@ -27,6 +28,7 @@ namespace TED.Processors
 
             try
             {
+                var sw = Stopwatch.StartNew();
                 if (release.ArtistThumbnail != null)
                 {
                     await File.WriteAllBytesAsync(Path.Combine(releaseDirectory, "artist.jpg"), release.ArtistThumbnail.Bytes);
@@ -75,6 +77,8 @@ namespace TED.Processors
                 });
                 var roadieDataFileName = Path.Combine(releaseDirectory, $"ted.data.json");
                 File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(release));
+                sw.Stop();
+                _logger.LogInformation("Saved Release [{ release }] Elapsed Time [{ elapsedTime }]", release.ToString(), sw.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {

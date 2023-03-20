@@ -846,8 +846,14 @@ namespace TED.Processors
                 return false;
             }
             var shortName = track.AudioFormat.ShortName;
+          
             if(Regex.IsMatch(shortName, "mpeg([0-9]*)", RegexOptions.IgnoreCase))
             {
+                var ext = track.FileInfo().Extension;
+                if(ext.ToLower().EndsWith("m4a")) // M4A is an audio file using the MP4 encoding
+                {
+                    return true;
+                }                  
                 return false;
             }            
             return true;
