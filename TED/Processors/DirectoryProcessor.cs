@@ -456,8 +456,7 @@ namespace TED.Processors
                 catch (Exception ex)
                 {
                     var throwError = true;
-                    if(ex.Message.Contains("1252") && 
-                       ex.Message.Contains("encoding name"))
+                    if(ex.Message.Contains("encoding name"))
                     {
                        // Encoding wind1252 = Encoding.GetEncoding(1252);
                         Encoding wind1252 = CodePagesEncodingProvider.Instance.GetEncoding(1252);
