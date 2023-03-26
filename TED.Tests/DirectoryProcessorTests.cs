@@ -83,11 +83,14 @@ namespace TED.Tests
         [DataRow("Captain Morgan's Revenge(Limited Japanese Editiom) (10th Anniversary Edition)", true)]
         [DataRow("Captain Morgan's Revenge (Limited Japanese Editiom) (10th Anniversary Edition)", true)]
         [DataRow("Hard work (EP)", true)]
-        [DataRow("Hard work EP", true)]
+        [DataRow("Hard work EP", true)]        
         [DataRow("Experience Yourself Ep", true)]        
+        [DataRow("Experience Yourself LP", true)]        
         [DataRow("Experience Yourself (Single)", true)]        
         [DataRow("Escape (Deluxe Edition)", true)]        
         [DataRow("Escape (Deluxe)", true)]        
+        [DataRow("Arsenal of Glory (Re-Edition)", true)]
+        [DataRow("Arsenal of Glory (2005 Edition)", true)]
         public void ReleaseTitleHasUnwantedText(string releaseTitle, bool shouldBe)
         {
             Assert.AreEqual(shouldBe, DirectoryProcessor.ReleaseTitleHasUnwantedText(releaseTitle));
