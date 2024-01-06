@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.CookiePolicy;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Configuration;
 using MudBlazor.Services;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,13 +13,14 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddMudServices();
 
+builder.Host.UseSerilog((hostContext, services, configuration) =>
+{
+    configuration.ReadFrom.Configuration(hostContext.Configuration);
+});
+
 ConfigurationManager configuration = builder.Configuration; // allows both to access and to set up the config
 IWebHostEnvironment environment = builder.Environment;
 
-builder.Services.AddLogging(loggingBuilder => {
-    var loggingSection = configuration.GetSection("Logging");
-    loggingBuilder.AddFile(loggingSection);
-});
 
 builder.Services.Configure<TED.Models.Configuration>(builder.Configuration.GetSection("TED"));
 
@@ -34,6 +37,8 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseStaticFiles();
+
+app.UseSerilogRequestLogging();
 
 app.UseRouting();
 

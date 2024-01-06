@@ -12,6 +12,7 @@
 @inject ILogger<Staging> logger
 @inject ILoggerFactory LoggerFactory
 @inject IOptions<TED.Models.Configuration> TEDConfiguration
+ @inject NavigationManager NavigationManager
  
 @page "/staging"
 
@@ -50,10 +51,10 @@
     <MudSpacer />
     @if (_releases.Any(x => x.Status != Enums.Statuses.Ok))
     {
-        <MudBadge Max="1000" Size="Size.Medium" Content="@_releases.Count(x => x.Status == Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
+        <MudBadge Max="1000" Size="Size.Medium" Content="@_releases.Count(x => x != null && x.Status == Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
             <MudIcon Icon="@Icons.Material.Outlined.Folder" Color="Color.Success" />
         </MudBadge>
-        <MudBadge Max="1000" Size="Size.Medium" Content="@_releases.Count(x => x.Status != Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
+        <MudBadge Max="1000" Size="Size.Medium" Content="@_releases.Count(x => x != null && x.Status != Enums.Statuses.Ok)" Overlap="true" Class="mx-3 my-4">
             <MudIcon Icon="@Icons.Material.Outlined.Folder" Color="Color.Warning" />
         </MudBadge>
     }
@@ -154,7 +155,8 @@
     bool _scanning = false;
     bool _movingFolders = false;
     int _sortingBy = 0;
-
+    readonly CancellationTokenSource tokenSource = new();
+    
     string sortingIcon(int selectedSortingBy)
     {
         if(_sortingBy == selectedSortingBy)
@@ -182,6 +184,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        NavigationManager.LocationChanged += (_, _) => tokenSource.Cancel();
         _releaseEditProcessor = new ReleaseEditProcessor(LoggerFactory.CreateLogger<ReleaseEditProcessor>());
         await Task.CompletedTask;
     }
@@ -215,7 +218,7 @@
                 }
                 catch(Exception ex)             
                 {
-                    logger.LogError(ex, "Error Deleting Images in directory [{ dir }]", dir);
+                    logger.LogError(ex, "Error Deleting Images in directory [{Dir}]", dir);
 
                 }
             }
@@ -238,7 +241,7 @@
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError(ex, "Error Deleting Images in directory [{ dir }]", dir);
+                        logger.LogError(ex, "Error Deleting Images in directory [{Dir}]", dir);
 
                     }
                 }
@@ -272,7 +275,7 @@
             }
             else
             {
-                logger.LogWarning("Attempted to delete non-existant directory [{ dir}]", dir);
+                logger.LogWarning("Attempted to delete non-existant directory [{Dir}]", dir);
 
             }
         }
@@ -305,7 +308,7 @@
 
     void EditRelease(StagingRelease release)
     {
-        UriHelper.NavigateTo($"/editrelease/{ System.Net.WebUtility.UrlEncode(release.Directory) }");
+        UriHelper.NavigateTo($"/editrelease/{ Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(release.Directory)) }");
     }
 
     void ToggleSelected(bool selected)
@@ -361,6 +364,10 @@
             _processingDirectoryProgress = 0;
             await Parallel.ForEachAsync(selectedReleases, async (selectedRelease, cancellationToken) =>
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
                 try
                 {
                     var processResult = await releaseSaveProcessor.ProcessAsync(now, await _releaseEditProcessor.DoMagic(selectedRelease));
@@ -371,21 +378,21 @@
                         {
                             await InvokeAsync(StateHasChanged);
                         }
-                        logger.LogInformation("Performed Magic on Release directory [{ release }]", selectedRelease);
+                        logger.LogInformation("Performed Magic on Release directory [{Release}]", selectedRelease);
                     }
                     else
                     {
-                        logger.LogWarning("Unable to Perform Magic on Release directory [{ release }] Messages [{ messages }]", selectedRelease, processResult.Item2.ToCsv() );
+                        logger.LogWarning("Unable to Perform Magic on Release directory [{Release] Messages [{Messages}]", selectedRelease, processResult.Item2.ToCsv() );
                     }
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Error Doing magic on Release [{ release }]", selectedRelease.ToString());
+                    logger.LogError(ex, "Error Doing magic on Release [{Release}]", selectedRelease.ToString());
                 }
             });
             _processingDirectoryProgress = 0;
             _movingFolders = false;
-            logger.LogDebug("** Magic Completed. Processed [{ releaseCount }] Releases. Elapsed Time [{ elapsedTime }]", _releases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);
+            logger.LogDebug("** Magic Completed. Processed [{ReleaseCount}] Releases. Elapsed Time [{ElapsedTime}]", _releases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);
             await DoScan();
         }
     }
@@ -417,18 +424,18 @@
                     {
                         await InvokeAsync(StateHasChanged);
                     }
-                    logger.LogInformation("Deleted Release directory [{ dir }]", selectedRelease.Directory);
+                    logger.LogInformation("Deleted Release directory [{Dir}]", selectedRelease.Directory);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Error Deleting Release directory [{ dir }]", selectedRelease.Directory);
+                    logger.LogError(ex, "Error Deleting Release directory [{Dir}] Ex [{@Error}]", selectedRelease.Directory, ex);
 
                 }
             });
             _processingDirectoryProgress = 0;
             StateHasChanged();
             _movingFolders = false;
-            logger.LogDebug("** Deleting Completed. Deleted [{ releaseCount }] Releases. Elapsed Time [{ elapsedTime }]", selectedReleases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);            
+            logger.LogDebug("** Deleting Completed. Deleted [{ReleaseCount}] Releases. Elapsed Time [{ElapsedTime}]", selectedReleases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);            
         }
     }
 
@@ -441,7 +448,7 @@
         _processingDirectoryProgress = 0;
         var now = DateTime.UtcNow;
         var sw = new System.Diagnostics.Stopwatch();
-        logger.LogInformation("Moving [{ releaseCount }] Releases to inbound [{ inbound }]", selectedReleases.Count(), inboundDirectory);
+        logger.LogInformation("Moving [{ReleaseCount}] Releases to inbound [{Inbound}]", selectedReleases.Count(), inboundDirectory);
         foreach(var selectedRelease in selectedReleases)
         {
             try
@@ -454,19 +461,19 @@
                     await InvokeAsync(StateHasChanged);
                 }
                 sw.Stop();
-                logger.LogInformation("Moved [{ dir }] to inbound [{ inbound }] elapsed time [{ elapsedTime }]", selectedRelease.Directory, inboundDirectory, sw.ElapsedMilliseconds);
+                logger.LogInformation("Moved [{Dir}] to inbound [{Inbound}] elapsed time [{ElapsedTime}]", selectedRelease.Directory, inboundDirectory, sw.ElapsedMilliseconds);
 
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error Moving Release directory [{ dir }]", selectedRelease.Directory);
+                logger.LogError(ex, "Error Moving Release directory [{Dir}]", selectedRelease.Directory);
 
             }
         }
         _processingDirectoryProgress = 0;
         StateHasChanged();
         _movingFolders = false;
-        logger.LogDebug("** Moving Completed. Moved [{ selectedReleases }] Releases. Elapsed Time [{ elapsedTime }]", selectedReleases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);        
+        logger.LogDebug("** Moving Completed. Moved [{SelectedReleases}] Releases. Elapsed Time [{ElapsedTime}]", selectedReleases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);        
         await DoScan();
     }
 
@@ -487,6 +494,7 @@
     {
         if (!_scanning && !_movingFolders)
         {
+            logger.LogDebug("DoScan on StagingDirectory [{Folder}]", TEDConfiguration.Value.StagingDirectory);
             _processingDirectoryProgress = 0;
             _scanning = true;
             var now = DateTime.UtcNow;
@@ -503,7 +511,11 @@
             sw.Start();
             foreach (var dir in directorysToProcess)
             {
-                logger.LogDebug("Scanning [{ folder }]", dir);
+                if (tokenSource.IsCancellationRequested)
+                {
+                    break;
+                }
+                logger.LogDebug("Scanning [{Folder}]", dir);
                 StagingRelease releaseForDirectory = null;
                 var filesInDirectory = Directory.GetFiles(dir, "*.*", SearchOption.TopDirectoryOnly);
                 if (filesInDirectory.Any())
@@ -519,7 +531,7 @@
                             _releases.Add(releaseForDirectory);
                             sw.Stop();
                             StateHasChanged();
-                            logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", dir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
+                            logger.LogInformation("Scanned [{Folder}] Release Status [{Status}] Elapsed Time [{ElapsedTime}]", dir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
                             sw.Restart();
                         }
                     }
@@ -533,7 +545,7 @@
                 {
                     try
                     {
-                        logger.LogDebug("Scanning [{ folder }] Directory [{ subDir }]", dir, subDir);
+                        logger.LogDebug("Scanning [{Folder}] Directory [{SubDir}]", dir, subDir);
                         releaseForDirectory = (await directoryProcessor.ProcessAsync(now, subDir, Directory.GetFiles(subDir))).Adapt<StagingRelease>();
                         if (releaseForDirectory != null && releaseForDirectory.Status != Enums.Statuses.NoMediaFiles)
                         {
@@ -542,7 +554,7 @@
                             _releases.Add(releaseForDirectory);
                             sw.Stop();
                             StateHasChanged();
-                            logger.LogInformation("Scanned [{ folder }] Release Status [{ status }] Elapsed Time [{ elapsedTime }]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
+                            logger.LogInformation("Scanned [{Folder}] Release Status [{Status}] Elapsed Time [{ElapsedTime}]", subDir, releaseForDirectory?.Status, sw.ElapsedMilliseconds);
                             sw.Restart();
                         }
                         if (_releases.Count() >= StagingDirectoryScanLimit)
@@ -553,7 +565,7 @@
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError(ex, "Error Scaning SubDirectory [{ subDir }]", subDir);
+                        logger.LogError(ex, "Error Scanning SubDirectory [{SubDir}], Ex [{@Error}]", subDir, ex);
                     }
                 }
                 _processingDirectoryProgress++;
@@ -564,7 +576,7 @@
             StateHasChanged();
             _allReleases = _releases;
             MarkDuplicates();
-            logger.LogDebug("** Scanning Completed. Found [{ releaseCount }] Releases. Elapsed Time [{ elapsedTime }]", _releases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);
+            logger.LogDebug("** Scanning Completed. Found [{ReleaseCount}] Releases. Elapsed Time [{ElapsedTime}]", _releases.Count(), (DateTime.UtcNow - now).TotalMilliseconds);
         }
     }
 

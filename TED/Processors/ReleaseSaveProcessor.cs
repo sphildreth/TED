@@ -78,11 +78,11 @@ namespace TED.Processors
                 var roadieDataFileName = Path.Combine(releaseDirectory, $"ted.data.json");
                 File.WriteAllText(roadieDataFileName, JsonSerializer.Serialize(release));
                 sw.Stop();
-                _logger.LogInformation("Saved Release [{ release }] Elapsed Time [{ elapsedTime }]", release.ToString(), sw.ElapsedMilliseconds);
+                _logger.LogInformation("Saved Release [{Release}] Elapsed Time [{ElapsedTime}]", release.ToString(), sw.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error Saving [{ release }] [{ error}]", release.ToString(), ex.Message);
+                _logger.LogError("Error Saving [{Release}] [{@Error}]", release.ToString(), ex);
                 errorMessages.Add(ex.Message);
             }
             return (!errorMessages.Any(), errorMessages);

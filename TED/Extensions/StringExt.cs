@@ -2,11 +2,16 @@
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using TED.Utility;
 
 namespace TED.Extensions
 {
     public static class StringExt
     {
+        private static readonly string YearParseRegex = "(19|20)\\d{2}";
+        
+        private static readonly string TrackNumberParseRegex = @"\s*\d{2,}\s*-*\s*";
+        
         private static readonly Dictionary<char, string> UnicodeAccents = new Dictionary<char, string>
         {
             {'À', "A"}, {'Á', "A"}, {'Â', "A"}, {'Ã', "A"}, {'Ä', "Ae"}, {'Å', "A"}, {'Æ', "Ae"},
@@ -161,5 +166,45 @@ namespace TED.Extensions
             }
             return string.Equals(a1?.ToAlphanumericName(), a2?.ToAlphanumericName());
         }
+
+        public static int? TryToGetYearFromString(this string input)
+        {
+            if (input.Nullify() == null)
+            {
+                return null;
+            }
+            if(Regex.IsMatch(input, YearParseRegex, RegexOptions.RightToLeft))
+            {
+                return SafeParser.ToNumber<int?>(Regex.Match(input, YearParseRegex, RegexOptions.RightToLeft).Value);
+            }
+            return null;
+        }
+        
+        public static int? TryToGetTrackNumberFromString(this string input)
+        {
+            if (input.Nullify() == null)
+            {
+                return null;
+            }
+            if(Regex.IsMatch(input, TrackNumberParseRegex))
+            {
+                var v = new string(Regex.Match(input, TrackNumberParseRegex).Value.Where(c => char.IsDigit(c)).ToArray());
+                return SafeParser.ToNumber<int?>(v);
+            }
+            return null;
+        }        
+        
+        public static string RemoveTrackNumberFromString(this string input)
+        {
+            if (input.Nullify() == null)
+            {
+                return null;
+            }
+            if(Regex.IsMatch(input, TrackNumberParseRegex))
+            {
+                return Regex.Replace(input, TrackNumberParseRegex, string.Empty);
+            }
+            return null;
+        }            
     }
 }

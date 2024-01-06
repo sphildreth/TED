@@ -70,7 +70,7 @@
                                    Label="Release Date"
                                    Editable="true"
                                    DateFormat="yyyy-MM-dd" />
-                    <MudSimpleTable Style="pa-4 overflow-x: auto;0" Hover="true" Striped="true">
+                    <MudSimpleTable Style="padding:4px; overflow-x: auto;" Hover="true" Striped="true">
                     <colgroup>
                        <col span="1" style="width: 5%;">
                        <col span="1" style="width: 5%;">
@@ -100,7 +100,7 @@
 
                                     </td>
                                     <td>
-                                            <MudNumericField @bind-Value="@track.TrackNumber"
+                                            <MudNumericField T="int?" @bind-Value="@track.TrackNumber"
                                                   For="@(() => @track.TrackNumber)"
                                                      Min="1"
                                                      Max="1000"
@@ -129,7 +129,7 @@
         </MudCard>
     </MudItem>
     <MudItem xs="4">
-        <MudSimpleTable Style="pa-4 overflow-x: auto;">
+        <MudSimpleTable  Style="padding:4px; overflow-x: auto;">
             <thead>
                 <tr>
                     @foreach (var h in messageHeadings)
@@ -323,7 +323,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        ReleaseDirectory = System.Net.WebUtility.UrlDecode(ReleaseDirectory);
+        ReleaseDirectory = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(ReleaseDirectory));
         DirectoryProcessor directoryProcessor = new DirectoryProcessor(LoggerFactory.CreateLogger<DirectoryProcessor>());
         _releaseEditProcessor = new ReleaseEditProcessor(LoggerFactory.CreateLogger<ReleaseEditProcessor>());
         _release = await directoryProcessor.ProcessAsync(DateTime.UtcNow, ReleaseDirectory, Directory.GetFiles(ReleaseDirectory ?? string.Empty)) ?? _release;

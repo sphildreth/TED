@@ -4,20 +4,20 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using SerilogTimings;
 using TED.Enums;
 using TED.Extensions;
 using TED.Models;
 using TED.Models.CueSheet.Parsers;
 using TED.Models.MetaData;
 using TED.Utility;
-using cue = TED.Models.CueSheet;
+using Cue = TED.Models.CueSheet;
+using Format = ATL.Format;
 
 namespace TED.Processors
 {
     public sealed class DirectoryProcessor
     {
-        private static readonly string YearParseRegex = "(19|20)\\d{2}";
-
         public const short MinimumDiscNumber = 1;
 
         public const int MaximumDiscNumber = 500;
@@ -106,7 +106,10 @@ namespace TED.Processors
                     var fileAtl = new ATL.Track(file);
                     if (fileAtl != null)
                     {
-                        allfileAtlsFound.Add(fileAtl);
+                        if (!fileAtl.MetadataFormats.Any(x => x.ID < 0))
+                        {
+                            allfileAtlsFound.Add(fileAtl);
+                        }
                     }
                     if (string.Equals(Path.GetExtension(file), ".sfv", StringComparison.OrdinalIgnoreCase))
                     {
@@ -127,10 +130,10 @@ namespace TED.Processors
                 {
                     tagsFilesFound = cueCheckResult.Item2;
                 }                
-                var doesReleaseHaveNonMp3Tracks = tagsFilesFound.Any(x => ShouldMediaTrackBeConverted(x));
+                var doesReleaseHaveNonMp3Tracks = allfileAtlsFound.Any(x => ShouldMediaTrackBeConverted(x));
                 if (doesReleaseHaveNonMp3Tracks)
                 {
-                    tagsFilesFound = await ConvertToMp3(dir, tagsFilesFound.OrderBy(x => x.TrackNumber));
+                    tagsFilesFound = await ConvertToMp3(dir, allfileAtlsFound.Where(x => ShouldMediaTrackBeConverted(x)).OrderBy(x => x.TrackNumber));
                 }
                 if(!tagsFilesFound.Any())
                 {
@@ -138,6 +141,7 @@ namespace TED.Processors
                     release.Status = Statuses.NoMediaFiles;
                     return release;
                 }
+                // See if any tracks have track numbers and if those track number vary from the filenamed tracknumber if so then rename 
                 var filesAtlsGroupedByRelease = tagsFilesFound.GroupBy(x => x.Album);
                 foreach (var groupedByRelease in filesAtlsGroupedByRelease)
                 {
@@ -424,7 +428,7 @@ namespace TED.Processors
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error Processing Directory [{ dir }]", dir);
+                _logger.LogError(ex, "Error Processing Directory [{Dir}]", dir);
                 release.ProcessingMessages.Add(new ProcessMessage(ex));
             }
             return release;
@@ -473,13 +477,13 @@ namespace TED.Processors
                         }
                         catch (System.Exception ex2)
                         {
-                            logger.LogError("Error reading CUE [{ CUEFileForReleaseDirectory }] [{ex2}", CUEFileForReleaseDirectory, ex2.ToString());
+                            logger.LogError("Error reading CUE [{CUEFileForReleaseDirectory}] [{@Error}", CUEFileForReleaseDirectory, ex2);
                             return (false, null);
                         }
                     }
                     if(throwError)
                     {
-                        logger.LogError("Error reading CUE [{ CUEFileForReleaseDirectory }] [{ex}", CUEFileForReleaseDirectory, ex.ToString());
+                        logger.LogError("Error reading CUE [{CUEFileForReleaseDirectory}] [{@Error}", CUEFileForReleaseDirectory, ex);
                         return (false, null);
                     }
                 }
@@ -487,7 +491,7 @@ namespace TED.Processors
                 {
                     var cueSheetParser = new CueSheetParser(CUEFileForReleaseDirectory);
                     var cueSheet = cueSheetParser.Parse();
-                    var splitter = new cue.CueSheetSplitter(cueSheet, CUEFileForReleaseDirectory, (filePath, mp3FileName, skip, until) =>
+                    var splitter = new Cue.CueSheetSplitter(cueSheet, CUEFileForReleaseDirectory, (filePath, mp3FileName, skip, until) =>
                     {
                         return FFMpegArguments.FromFileInput(filePath)
                         .OutputToFile(mp3FileName, true, options =>
@@ -521,7 +525,7 @@ namespace TED.Processors
                         fileAtl.TrackNumber = readerTrack.TrackNumber;
                         fileAtl.TrackTotal = theReader.Tracks.Count();
                         fileAtl.Genre = readerTrack.Genre;
-                        fileAtl.Year = SafeParser.ToDateTime(cueSheet.Date)?.Year ?? TryToGetYearFromString(CUEFileForReleaseDirectory) ?? throw new Exception("Invalid Release year");
+                        fileAtl.Year = SafeParser.ToDateTime(cueSheet.Date)?.Year ?? CUEFileForReleaseDirectory?.TryToGetYearFromString() ?? throw new Exception("Invalid Release year");
                         var trackArtist = readerTrack.Artist.Nullify();
                         if (trackArtist != null && !StringExt.DoStringsMatch(releaseArtist, trackArtist))
                         {
@@ -615,7 +619,7 @@ namespace TED.Processors
                             }
                             catch (Exception ex)
                             {
-                                logger.LogError("Error Moving Cover Image [{coverImage}]: [{error}]", coverImage, ex.Message);
+                                logger.LogError("Error Moving Cover Image [{CoverImage}]: [{@Error}]", coverImage, ex);
                             }
                         });
                         processingFoundNewFiles = true;
@@ -626,7 +630,7 @@ namespace TED.Processors
                 // If the subdir is a media folder (like "CD01") then move the media files from the sub directory up one with media name
                 if (IsDirectoryMediaDirectory(releaseDirectory, subDirectory.FullName))
                 {
-                    logger.LogDebug("SubDirectory [{ subDirectory }] determined to be media folder for [{ releaseDirectory }]", subDirectory.FullName, releaseDirectory);
+                    logger.LogDebug("SubDirectory [{SubDirectory}] determined to be media folder for [{ReleaseDirectory}]", subDirectory.FullName, releaseDirectory);
                     if (subDirectoryFiles.Any())
                     {
                         Parallel.ForEach(subDirectoryFiles, subDirectoryFile =>
@@ -647,7 +651,7 @@ namespace TED.Processors
                                 }
                                 catch (Exception ex)
                                 {
-                                    logger.LogError("Error Moving Media File [{subDirectoryFile}]: [{error}]", subDirectoryFile.FullName, ex.Message);
+                                    logger.LogError("Error Moving Media File [{SubDirectoryFile}]: [{@Error}]", subDirectoryFile.FullName, ex);
                                 }
                             }
                         });
@@ -666,7 +670,7 @@ namespace TED.Processors
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error Processing SubDirectory [{ subDir }]", subDirectory.FullName);
+                logger.LogError(ex, "Error Processing SubDirectory [{SubDir}]", subDirectory.FullName);
             }
             return processingFoundNewFiles;
         }
@@ -691,7 +695,7 @@ namespace TED.Processors
             var artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo, ImageType.Artist, SearchOption.TopDirectoryOnly);
             if (artistImagesInDirectory?.Any() ?? false)
             {
-                logger.LogDebug("Found Artist image [{artistImage}]", artistImagesInDirectory.First().FullName);
+                logger.LogDebug("Found Artist image [{ArtistImage}]", artistImagesInDirectory.First().FullName);
                 return (new Image
                 {
                     Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
@@ -703,7 +707,7 @@ namespace TED.Processors
                 artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo.Parent, ImageType.Artist, SearchOption.TopDirectoryOnly);
                 if (artistImagesInDirectory?.Any() ?? false)
                 {
-                    logger.LogDebug("Found Artist image [{artistImage}]", artistImagesInDirectory.First().FullName);
+                    logger.LogDebug("Found Artist image [{ArtistImage}]", artistImagesInDirectory.First().FullName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
@@ -715,7 +719,7 @@ namespace TED.Processors
                     artistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(parentCoversFolder, ImageType.Artist, SearchOption.TopDirectoryOnly);
                     if (artistImagesInDirectory?.Any() ?? false)
                     {
-                        logger.LogDebug("Found Artist image [{artistImage}]", artistImagesInDirectory.First().FullName);
+                        logger.LogDebug("Found Artist image [{ArtistImage}]", artistImagesInDirectory.First().FullName);
                         return (new Image
                         {
                             Bytes = await File.ReadAllBytesAsync(artistImagesInDirectory.First().FullName)
@@ -725,7 +729,7 @@ namespace TED.Processors
                 var secondaryArtistImagesInDirectory = ImageHelper.FindImageTypeInDirectory(dirInfo, ImageType.ArtistSecondary, SearchOption.TopDirectoryOnly);
                 if (secondaryArtistImagesInDirectory?.Any() ?? false)
                 {
-                    logger.LogDebug("Found Secondary Artist image [{artistImage}]", secondaryArtistImagesInDirectory.First().FullName);
+                    logger.LogDebug("Found Secondary Artist image [{ArtistImage}]", secondaryArtistImagesInDirectory.First().FullName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(secondaryArtistImagesInDirectory.First().FullName)
@@ -734,7 +738,7 @@ namespace TED.Processors
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error Finding Artist Image in [{ dir }]", dir);
+                logger.LogError(ex, "Error Finding Artist Image in [{Dir}]", dir);
             }
             return (null, 0, 0);
         }
@@ -765,7 +769,7 @@ namespace TED.Processors
             {
                 if (!IsImageAProofType(releaseImagesInDirectory.First()))
                 {
-                    logger.LogDebug("Found Release image [{releaseImage}]", releaseImagesInDirectory.First().FullName);
+                    logger.LogDebug("Found Release image [{ReleaseImage}]", releaseImagesInDirectory.First().FullName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(releaseImagesInDirectory.First().FullName)
@@ -777,7 +781,7 @@ namespace TED.Processors
             {
                 if (!IsImageAProofType(secondaryReleaseImagesInDirectory.First()))
                 {
-                    logger.LogDebug("Found Secondary Release image [{releaseImage}]", secondaryReleaseImagesInDirectory.First().FullName);
+                    logger.LogDebug("Found Secondary Release image [{ReleaseImage}]", secondaryReleaseImagesInDirectory.First().FullName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(secondaryReleaseImagesInDirectory.First().FullName)
@@ -790,7 +794,7 @@ namespace TED.Processors
             {
                 if (!IsImageAProofType(releaseImagesInParentDirectory.First()))
                 {
-                    logger.LogDebug("Found Release image [{releaseImage}]", releaseImagesInParentDirectory.First().FullName);
+                    logger.LogDebug("Found Release image [{ReleaseImage}]", releaseImagesInParentDirectory.First().FullName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(releaseImagesInParentDirectory.First().FullName)
@@ -824,7 +828,7 @@ namespace TED.Processors
                 }
                 if (foundImageFileName != null && !IsImageAProofType(new FileInfo(foundImageFileName)))
                 {
-                    logger.LogDebug("Found Release image [{releaseImage}]", foundImageFileName);
+                    logger.LogDebug("Found Release image [{ReleaseImage}]", foundImageFileName);
                     return (new Image
                     {
                         Bytes = await File.ReadAllBytesAsync(foundImageFileName)
@@ -833,14 +837,14 @@ namespace TED.Processors
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Attempting to find Release images", dir);
+                _logger.LogError(ex, "Attempting to find Release images in [{DirectoryName}]", dir);
             }
             return (null, 0, 0);
         }
 
         public static bool ShouldMediaTrackBeConverted(ATL.Track track)
         {
-            if(track?.AudioFormat == null)
+            if(track?.AudioFormat == null || (track?.AudioFormat?.MimeList?.Contains("image") ?? false))
             {
                 return false;
             }
@@ -852,7 +856,8 @@ namespace TED.Processors
                 if(ext.ToLower().EndsWith("m4a")) // M4A is an audio file using the MP4 encoding
                 {
                     return true;
-                }                  
+                }                 
+                
                 return false;
             }            
             return true;
@@ -879,7 +884,7 @@ namespace TED.Processors
                 {
                     result.Add(newAtl);
                     trackFileInfo.Delete();
-                    _logger.LogInformation("Converted [{ trackFile }] to MP3", trackFileInfo.FullName);
+                    _logger.LogInformation("Converted [{TrackFile}] to MP3", trackFileInfo.FullName);
                 }
                 else
                 {
@@ -1186,12 +1191,18 @@ namespace TED.Processors
                 string name = Path.GetFileName(file);
                 string dest = Path.Combine(destinationDirectory, name);
                 if (string.Equals(name, "ted.data.json", StringComparison.OrdinalIgnoreCase))
-                {
-                    File.Delete(file);
+                {                    
+                    using (Operation.Time("Deleting File [{File}]", file))
+                    {
+                        File.Delete(file);
+                    }
                 }
                 else
                 {
-                    File.Move(file, dest, true);
+                    using (Operation.Time("Moving File [{File}] To [{Dest}]", file, dest))
+                    {
+                        File.Move(file, dest, true);
+                    }
                 }
             }
             string[] folders = Directory.GetDirectories(sourceDirectory);
@@ -1226,19 +1237,6 @@ namespace TED.Processors
             {
                 DeleteFolderIfEmpty(new DirectoryInfo(subDir));
             }
-        }
-
-        public static int? TryToGetYearFromString(string input)
-        {
-            if (input.Nullify() == null)
-            {
-                return null;
-            }
-            if(Regex.IsMatch(input, YearParseRegex, RegexOptions.RightToLeft))
-            {
-                return SafeParser.ToNumber<int?>(Regex.Match(input, YearParseRegex, RegexOptions.RightToLeft).Value);
-            }
-            return null;
         }
     }
 }
